@@ -1,0 +1,7 @@
+# Sorties de compilation
+out/
+
+# Divers
+*.log
+Thumbs.db
+desktop.ini
