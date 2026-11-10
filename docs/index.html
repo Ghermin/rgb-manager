@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gestionnaire RGB : l'éclairage du PC sans Armoury Crate ni iCUE</title>
+<meta name="description" content="Petit gestionnaire d'éclairage RGB pour Windows : carte mère ASUS AURA, RAM Corsair, watercooling Commander CORE et ruban du boîtier, depuis une icône près de l'horloge. Sans Armoury Crate, iCUE ni OpenRGB.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0d10" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icon.png" type="image/png">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="icon.png">
+<meta property="og:title" content="Gestionnaire RGB">
+<meta property="og:description" content="L'éclairage RGB du PC depuis la zone de notification, sans Armoury Crate ni iCUE.">
+<meta property="og:image" content="https://ghermin.github.io/rgb-manager/icon.png">
+<meta property="og:url" content="https://ghermin.github.io/rgb-manager/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="playground.css">
+<style>
+  :root {
+    --pg-bg: #f5f6f8; --pg-surface: #ffffff; --pg-surface-2: #eceef2; --pg-text: #121318; --pg-muted: #565a66;
+    --pg-line: #dfe2e8; --pg-dot: rgba(18, 19, 24, .08);
+    --pg-accent: #2557e8; --pg-accent-2: #e0245e;
+    --r: #e0245e; --g: #13a35a; --b: #2557e8;
+    --pg-grad: linear-gradient(100deg, var(--r), var(--g) 50%, var(--b));
+    --menu-shadow: 0 24px 60px -24px rgba(18, 19, 24, .3);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --pg-bg: #0c0d10; --pg-surface: #15161b; --pg-surface-2: #1d1f26; --pg-text: #eef0f5; --pg-muted: #9ea3b0;
+      --pg-line: #272a33; --pg-dot: rgba(238, 240, 245, .06);
+      --pg-accent: #6f93ff; --pg-accent-2: #ff5c8a; --pg-on-accent: #ffffff;
+      --r: #ff5c7a; --g: #3ddc84; --b: #6f93ff;
+      --menu-shadow: 0 24px 60px -20px rgba(0, 0, 0, .75);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { font-family: "Sora", system-ui, sans-serif; font-size: 16px; }
+  a { color: var(--pg-accent); }
+
+  /* Halos rouge, vert, bleu derrière l'accroche, comme l'icône */
+  .pg-hero { position: relative; }
+  .pg-hero::before {
+    content: ""; position: absolute; inset: -80px -20vw auto; height: 560px; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(28% 40% at 22% 18%, color-mix(in srgb, var(--r) 16%, transparent), transparent 70%),
+      radial-gradient(28% 40% at 48% 8%, color-mix(in srgb, var(--g) 14%, transparent), transparent 70%),
+      radial-gradient(28% 40% at 74% 22%, color-mix(in srgb, var(--b) 16%, transparent), transparent 70%);
+  }
+  .pg-btn--primary { background: var(--pg-text); color: var(--pg-bg); }
+
+  /* Accroche sur deux colonnes : texte + menu de l'appli */
+  .hero-grid { display: grid; gap: 48px; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); align-items: center; }
+  @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; } }
+
+  /* Reproduction du menu de la zone de notification (mêmes entrées que TrayApp.cs) */
+  .tray { justify-self: center; width: min(100%, 320px); }
+  .menu {
+    margin: 0; padding: 6px; list-style: none; border: 1px solid var(--pg-line); border-radius: 12px;
+    background: var(--pg-surface); box-shadow: var(--menu-shadow); font-size: 14px;
+  }
+  .menu li { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-radius: 7px; }
+  .menu li.title { font-weight: 700; color: var(--pg-muted); }
+  .menu li.sep { padding: 0; margin: 5px 8px; height: 1px; background: var(--pg-line); }
+  .menu li.sub::after { content: "›"; margin-left: auto; color: var(--pg-muted); }
+  .menu li.on { background: var(--pg-surface-2); }
+  .menu li.on::after { content: "✓"; margin-left: auto; color: var(--pg-muted); font-size: 13px; }
+  .menu .sw { width: 14px; height: 14px; border-radius: 4px; flex: none; border: 1px solid rgba(127, 127, 127, .35); }
+  .menu .sigline { font: 500 11px/1.5 var(--pg-mono); color: var(--pg-muted); opacity: .8; }
+  .swatches { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 12px 8px !important; }
+  .swatches .sw { width: 18px; height: 18px; border-radius: 5px; }
+  .taskbar {
+    margin: 14px auto 0; width: max-content; display: flex; align-items: center; gap: 12px; padding: 7px 14px;
+    border: 1px solid var(--pg-line); border-radius: 10px; background: var(--pg-surface-2);
+    font: 12px/1 var(--pg-mono); color: var(--pg-muted);
+  }
+  .taskbar img { width: 18px; height: 18px; border-radius: 4px; outline: 2px solid color-mix(in srgb, var(--pg-accent) 55%, transparent); outline-offset: 3px; }
+
+  .features .pg-card h3 { display: flex; align-items: center; gap: 10px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--pg-grad); }
+
+  /* Tableau du matériel pris en charge */
+  .hw { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .hw-wrap { border: 1px solid var(--pg-line); border-radius: var(--pg-radius); background: var(--pg-surface); overflow: hidden; }
+  .hw th, .hw td { padding: 14px 18px; text-align: left; vertical-align: top; border-top: 1px solid var(--pg-line); }
+  .hw thead th { border-top: 0; background: var(--pg-surface-2); font: 500 12px/1.4 var(--pg-mono); color: var(--pg-muted); text-transform: uppercase; letter-spacing: .04em; }
+  .hw tbody th { font-weight: 600; white-space: nowrap; }
+  .hw td { color: var(--pg-muted); }
+  @media (max-width: 640px) {
+    .hw thead { display: none; }
+    .hw tr { display: block; padding: 14px 18px; border-top: 1px solid var(--pg-line); }
+    .hw tbody tr:first-child { border-top: 0; }
+    .hw th, .hw td { display: block; padding: 0; border: 0; }
+    .hw td { margin-top: 4px; }
+  }
+
+  .pg-note.warn {
+    background: color-mix(in srgb, #d97706 9%, var(--pg-surface));
+    border-color: color-mix(in srgb, #d97706 35%, var(--pg-line));
+  }
+  pre {
+    margin: 14px 0 0; padding: 14px 16px; overflow-x: auto; border-radius: var(--pg-radius-sm);
+    background: var(--pg-surface-2); font: 13.5px/1.6 var(--pg-mono);
+  }
+  .pg-end img { border-radius: 14px; }
+</style>
+</head>
+<body class="pg-page">
+<nav class="pg-strip" aria-label="Bored Dev Playground">
+  <div class="pg-strip__in">
+    <a class="pg-strip__home" href="https://ghermin.github.io/">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="pg-logo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#ff6b6b"/></linearGradient></defs><rect width="64" height="64" rx="16" fill="url(#pg-logo)"/><path d="M14 27h14M36 27h14" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><path d="M16 27a5 5 0 0 0 10 0zM38 27a5 5 0 0 0 10 0z" fill="#fff"/><rect x="24" y="41" width="16" height="4.5" rx="2.25" fill="#fff"/></svg>
+      <b>bored dev playground</b><span class="pg-strip__crumb">/ rgb-manager</span>
+    </a>
+    <a class="pg-strip__all" href="https://ghermin.github.io/">tous les projets <span aria-hidden="true">→</span></a>
+  </div>
+</nav>
+
+<header class="pg-top">
+  <a class="pg-brand" href="#"><img src="icon.png" alt="">Gestionnaire RGB</a>
+  <nav class="pg-nav">
+    <a href="#fonctions">Fonctionnalités</a>
+    <a href="#materiel">Matériel</a>
+    <a href="#installer">Installer</a>
+    <a class="pg-gh" href="https://github.com/Ghermin/rgb-manager">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </nav>
+</header>
+
+<main>
+  <section class="pg-hero">
+    <div class="hero-grid">
+      <div>
+        <div class="pg-hero__tags">
+          <p class="pg-kicker">~/projets/rgb-manager</p>
+          <ul class="pg-chips" role="list"><li>Windows</li><li>RGB</li><li>C#</li></ul>
+        </div>
+        <h1>Tout l'éclairage du PC, <span class="pg-grad">d'un seul clic</span>.</h1>
+        <p class="pg-lead">Une icône près de l'horloge pour régler en même temps la carte mère, la RAM, le watercooling et le boîtier. Sans Armoury Crate, sans iCUE, sans OpenRGB : un seul petit exécutable, aucun service, aucune télémétrie.</p>
+        <div class="pg-cta">
+          <a class="pg-btn pg-btn--primary" href="https://github.com/Ghermin/rgb-manager">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+            Code source
+          </a>
+          <a class="pg-btn" href="#materiel">Matériel pris en charge</a>
+        </div>
+        <p class="pg-meta">Windows 10 et 11 · 64 bits · .NET Framework 4.8 (déjà dans Windows) · GPL-2.0</p>
+      </div>
+
+      <div class="tray" aria-label="Le menu de l'appli, ouvert depuis la zone de notification" role="img">
+        <ul class="menu" aria-hidden="true">
+          <li class="title">Gestionnaire RGB</li>
+          <li class="sep"></li>
+          <li class="swatches">
+            <span class="sw" style="background:#fff"></span><span class="sw" style="background:#f00"></span><span class="sw" style="background:#ff5a00"></span><span class="sw" style="background:#ffbe00"></span><span class="sw" style="background:#0f0"></span><span class="sw" style="background:#0ff"></span><span class="sw" style="background:#00f"></span><span class="sw" style="background:#9600ff"></span><span class="sw" style="background:#ff0078"></span>
+          </li>
+          <li>Couleur personnalisée…</li>
+          <li class="sep"></li>
+          <li class="sub">Effet</li>
+          <li class="sub">Luminosité</li>
+          <li class="sub">Vitesse des effets</li>
+          <li class="sub">Appareils</li>
+          <li class="sep"></li>
+          <li class="on">Lancer au démarrage de Windows</li>
+          <li>Ouvrir le journal</li>
+          <li>Quitter</li>
+          <li class="sep"></li>
+          <li><span class="sigline">un projet du bored dev playground</span></li>
+        </ul>
+        <div class="taskbar" aria-hidden="true"><span>FR</span><img src="icon.png" alt=""><span>21:42</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pg-section" id="fonctions">
+    <p class="pg-kicker">Fonctionnalités</p>
+    <h2>Le nécessaire, rien de plus</h2>
+    <p class="pg-section__lead">L'appli calcule chaque image elle-même et l'envoie à chaque appareil en « mode direct » : tout est synchronisé, sans dépendre des effets intégrés au matériel.</p>
+    <div class="pg-grid features">
+      <div class="pg-card"><h3><span class="dot"></span>Couleurs et effets</h3><p>Neuf couleurs prêtes ou une couleur au choix. Effets statique, respiration, arc-en-ciel ou éteint, avec luminosité et vitesse réglables.</p></div>
+      <div class="pg-card"><h3><span class="dot"></span>Tout ensemble</h3><p>Carte mère, RAM, watercooling et ruban du boîtier changent en même temps. Chaque appareil peut être coupé séparément.</p></div>
+      <div class="pg-card"><h3><span class="dot"></span>Surveille la pompe</h3><p>Si la pompe du watercooling passe sous 400 tr/min, l'appli rend aussitôt la main au boîtier Corsair. Les vitesses ne sont jamais modifiées.</p></div>
+      <div class="pg-card"><h3><span class="dot"></span>Léger et discret</h3><p>Un seul exécutable, lancé avec Windows par une tâche planifiée, sans fenêtre UAC. Il reprend tout seul après la veille.</p></div>
+    </div>
+  </section>
+
+  <section class="pg-section" id="materiel">
+    <p class="pg-kicker">Matériel</p>
+    <h2>Écrit pour un PC précis</h2>
+    <p class="pg-section__lead">Sur un autre PC, l'appli n'allume que ce qu'elle reconnaît. Pour du matériel varié, <a href="https://openrgb.org">OpenRGB</a> reste la solution générique.</p>
+    <div class="hw-wrap">
+      <table class="hw">
+        <thead><tr><th scope="col">Appareil</th><th scope="col">Pris en charge</th><th scope="col">Comment</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Carte mère ASUS</th><td>Contrôleur AURA USB <code>0B05:1939</code> (ex. ROG STRIX B550-A GAMING)</td><td>HID, mode direct : 2 prises RGB 12 V et 1 prise ARGB</td></tr>
+          <tr><th scope="row">RAM</th><td>Corsair DDR4 RGB (Dominator Platinum, Vengeance RGB Pro/SL/RS) sur chipset AMD</td><td>SMBus via <a href="https://pawnio.eu">PawnIO</a>, le remplaçant signé de WinRing0</td></tr>
+          <tr><th scope="row">Watercooling</th><td>Corsair iCUE Commander CORE <code>1B1C:0C1C</code></td><td>HID, vitesses de la pompe et des ventilateurs jamais modifiées</td></tr>
+          <tr><th scope="row">Boîtier</th><td>Ruban ARGB branché sur la carte mère (ex. be quiet! Pure Base 500DX)</td><td>Via la prise ARGB de la carte mère</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="pg-note">Pas pris en charge pour l'instant : autres cartes mères, RAM DDR5 ou d'autres marques, chipsets Intel, cartes graphiques, périphériques.</p>
+  </section>
+
+  <section class="pg-section" id="installer">
+    <p class="pg-kicker">Installer</p>
+    <h2>Compilé sur votre PC</h2>
+    <p class="pg-section__lead">Pas de Visual Studio ni de .NET SDK : le compilateur C# fourni avec PowerShell 7 suffit.</p>
+    <div class="pg-grid pg-steps">
+      <div class="pg-card"><h3>Préparer</h3><p>Installez <a href="https://aka.ms/powershell">PowerShell 7</a>, et <a href="https://github.com/namazso/PawnIO.Setup/releases">PawnIO</a> si vous voulez piloter la RAM.</p></div>
+      <div class="pg-card"><h3>Récupérer</h3><p>Téléchargez ou clonez le <a href="https://github.com/Ghermin/rgb-manager">code source</a> depuis GitHub.</p></div>
+      <div class="pg-card"><h3>Installer</h3><p>Dans le dossier, lancez la commande ci-dessous et acceptez les droits administrateur une fois.</p><pre><code>pwsh -File deploy.ps1 -Build</code></pre></div>
+    </div>
+    <p class="pg-note warn"><strong>Avant de lancer :</strong> fermez Armoury Crate, iCUE et OpenRGB, qui se disputeraient les mêmes appareils. L'appli s'installe dans <code>C:\Program Files\RgbManager</code>, avec un raccourci « Gestionnaire RGB » sur le Bureau.</p>
+  </section>
+
+  <section class="pg-end">
+    <img src="icon.png" alt="" width="56" height="56">
+    <h2>Un PC qui brille, sans trois logiciels pour ça.</h2>
+    <div class="pg-cta">
+      <a class="pg-btn pg-btn--primary" href="https://github.com/Ghermin/rgb-manager">Voir le code source</a>
+    </div>
+  </section>
+</main>
+
+<footer class="pg-foot">
+  <div class="pg-foot__in">
+    <p><a href="https://github.com/Ghermin/rgb-manager">Code source</a> · <a href="https://github.com/Ghermin/rgb-manager/issues">Signaler un problème</a> · Protocoles tirés d'<a href="https://gitlab.com/CalcProgrammer1/OpenRGB">OpenRGB</a></p>
+    <p>Un projet du <a href="https://ghermin.github.io/">Bored Dev Playground</a>, par <a href="https://github.com/Ghermin">Ghermin</a></p>
+  </div>
+</footer>
+</body>
+</html>

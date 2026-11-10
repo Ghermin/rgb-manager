@@ -8,6 +8,8 @@ namespace RgbManager;
 /// <summary>Icône dans la zone de notification avec un menu clic droit.</summary>
 sealed class TrayApp : ApplicationContext
 {
+    const string Playground = "https://ghermin.github.io/";
+
     static readonly (string Name, byte R, byte G, byte B)[] Presets =
     {
         ("Blanc", 255, 255, 255), ("Rouge", 255, 0, 0), ("Orange", 255, 90, 0), ("Jaune", 255, 190, 0),
@@ -101,6 +103,17 @@ sealed class TrayApp : ApplicationContext
         var quit = new ToolStripMenuItem("Quitter");
         quit.Click += (_, _) => ExitThread();
         _menu.Items.Add(quit);
+
+        // Lien discret vers le playground, tout en bas. Ouvert via explorer : le navigateur
+        // ne démarre pas avec les droits administrateur de l'appli.
+        _menu.Items.Add(new ToolStripSeparator());
+        var playground = new ToolStripMenuItem("un projet du bored dev playground")
+        {
+            ForeColor = SystemColors.GrayText,
+            Font = new Font("Consolas", 8f),
+        };
+        playground.Click += (_, _) => Process.Start("explorer.exe", Playground);
+        _menu.Items.Add(playground);
 
         _menu.Opening += (_, _) => RefreshMenu();
     }

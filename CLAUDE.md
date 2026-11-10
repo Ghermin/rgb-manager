@@ -34,3 +34,19 @@ Appli Windows (zone de notification) qui pilote l'éclairage RGB en mode direct.
 
 - Dépôt public `github.com/Ghermin/rgb-manager`, remote SSH.
 - Identité des commits : `Ghermin <Ghermin@users.noreply.github.com>` (configurée en local dans le dépôt ; la config globale contient une adresse pro à ne pas utiliser ici).
+
+## Bored Dev Playground
+
+Ce projet fait partie du Bored Dev Playground : https://ghermin.github.io/ (repo `Ghermin/Ghermin.github.io`, en local `../Ghermin.github.io`).
+Sa page GitHub (`docs/index.html`, publiée sur https://ghermin.github.io/rgb-manager/) suit le kit commun du playground.
+
+Avant de modifier la page ou le style, se demander si le changement est local ou global :
+
+- **Global** (bandeau, cartes, boutons, puces, pied de page, couleurs neutres, comportement clair / sombre…) : ne pas le faire ici. `docs/playground.css` est une copie de `kit/playground.css` du playground : modifier le kit là-bas, lancer `sh kit/sync.sh`, puis commiter dans chaque projet.
+- **Local** (couleurs ou police du projet) : le faire dans la page, en redéfinissant les variables `--pg-*` après le kit.
+- Si le nom, la description, les tags, l'icône ou l'adresse du projet changent, mettre à jour sa carte dans `index.html` du playground.
+- Le menu reproduit sur la page reprend les entrées de `TrayApp.BuildMenu()` : le mettre à jour si le menu change.
+- Icône : celle de l'appli (`assets/make-icon.ps1`), copiée dans `docs/icon.png` et `docs/favicon.ico`, et dans `assets/projects/rgb-manager.png` du playground. Pas (encore) de SVG dans `brand/icons/` : ne pas ajouter `rgb-manager` à `TARGETS` de `brand/build.js` sans revoir l'icône, il écraserait `assets/icon.ico`.
+- L'appli porte le lien discret « un projet du bored dev playground » en bas de son menu (`TrayApp.Playground`).
+
+À garder sur la page : le bandeau `pg-strip` qui ramène au playground, le thème clair / sombre automatique, le responsive (pas de défilement horizontal sur mobile), 2 polices max (Sora + JetBrains Mono).
