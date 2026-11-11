@@ -46,6 +46,7 @@ Avant de modifier la page ou le style, se demander si le changement est local ou
 - **Local** (couleurs ou police du projet) : le faire dans la page, en redéfinissant les variables `--pg-*` après le kit.
 - Si le nom, la description, les tags, l'icône ou l'adresse du projet changent, mettre à jour sa carte dans `index.html` du playground.
 - Le menu reproduit sur la page reprend les entrées de `TrayApp.BuildMenu()` : le mettre à jour si le menu change.
+- Le vrai menu a le même design que la page (`src/MenuTheme.cs` : couleurs `Palette.Light` / `Palette.Dark` = variables `--pg-*` de `docs/index.html`, coins arrondis DWM sous Windows 11). Il suit le mode clair / sombre de Windows, relu à chaque ouverture du menu. Changer les couleurs aux deux endroits.
 - Icône : celle de l'appli (`assets/make-icon.ps1`), copiée dans `docs/icon.png` et `docs/favicon.ico`, et dans `assets/projects/rgb-manager.png` du playground. Pas (encore) de SVG dans `brand/icons/` : ne pas ajouter `rgb-manager` à `TARGETS` de `brand/build.js` sans revoir l'icône, il écraserait `assets/icon.ico`.
 - L'appli porte le lien discret « un projet du bored dev playground » en bas de son menu (`TrayApp.Playground`).
 

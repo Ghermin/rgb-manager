@@ -21,6 +21,8 @@ sealed class TrayApp : ApplicationContext
     readonly NotifyIcon _tray;
     readonly Control _ui;
     readonly ContextMenuStrip _menu = new();
+    readonly MenuTheme _theme = new();
+    SwatchRow _swatches;
     readonly ToolStripMenuItem _statusAura = new() { Enabled = false };
     readonly ToolStripMenuItem _statusRam = new() { Enabled = false };
     readonly ToolStripMenuItem _statusCc = new() { Enabled = false };
@@ -65,16 +67,21 @@ sealed class TrayApp : ApplicationContext
 
     void BuildMenu()
     {
-        var title = new ToolStripMenuItem("Gestionnaire RGB") { Enabled = false, Font = new Font(_menu.Font, FontStyle.Bold) };
+        var title = new ToolStripMenuItem("Gestionnaire RGB") { Enabled = false, Font = MenuTheme.TitleFont };
         _menu.Items.Add(title);
         _menu.Items.Add(new ToolStripSeparator());
 
-        foreach (var p in Presets)
+        _swatches = new SwatchRow(Presets, _theme)
         {
-            var item = new ToolStripMenuItem(p.Name, Swatch(p.R, p.G, p.B)) { Tag = p };
-            item.Click += (_, _) => Change(s => { s.R = p.R; s.G = p.G; s.B = p.B; if (s.Effect is Effect.Off or Effect.Rainbow) s.Effect = Effect.Static; });
-            _menu.Items.Add(item);
-        }
+            Current = () => _settings.Effect == Effect.Rainbow ? -1 :
+                Array.FindIndex(Presets, p => p.R == _settings.R && p.G == _settings.G && p.B == _settings.B),
+        };
+        _swatches.Picked += i =>
+        {
+            var p = Presets[i];
+            Change(s => { s.R = p.R; s.G = p.G; s.B = p.B; if (s.Effect is Effect.Off or Effect.Rainbow) s.Effect = Effect.Static; });
+        };
+        _menu.Items.Add(_swatches);
         var custom = new ToolStripMenuItem("Couleur personnalisée…");
         custom.Click += (_, _) => PickColor();
         _menu.Items.Add(custom);
@@ -107,15 +114,12 @@ sealed class TrayApp : ApplicationContext
         // Lien discret vers le playground, tout en bas. Ouvert via explorer : le navigateur
         // ne démarre pas avec les droits administrateur de l'appli.
         _menu.Items.Add(new ToolStripSeparator());
-        var playground = new ToolStripMenuItem("un projet du bored dev playground")
-        {
-            ForeColor = SystemColors.GrayText,
-            Font = new Font("Consolas", 8f),
-        };
+        var playground = new ToolStripMenuItem("un projet du bored dev playground") { Tag = "sig", Font = MenuTheme.MonoFont };
         playground.Click += (_, _) => Process.Start("explorer.exe", Playground);
         _menu.Items.Add(playground);
 
         _menu.Opening += (_, _) => RefreshMenu();
+        _theme.Attach(_menu); // design de la page du projet, clair ou sombre selon Windows
     }
 
     ToolStripMenuItem Submenu(string text, params (string Label, Effect Value)[] options)
@@ -212,12 +216,9 @@ sealed class TrayApp : ApplicationContext
         _statusCc.Checked = _settings.Commander;
 
         foreach (ToolStripItem i in _menu.Items)
-        {
-            if (i is ToolStripMenuItem m && m.Tag is ValueTuple<string, byte, byte, byte> p)
-                m.Checked = p.Item2 == _settings.R && p.Item3 == _settings.G && p.Item4 == _settings.B && _settings.Effect != Effect.Rainbow;
             if (i is ToolStripMenuItem st && "startup".Equals(st.Tag))
                 st.Checked = Startup.IsEnabled();
-        }
+        _swatches.Invalidate();
 
         string effect = _settings.Effect switch
         {
@@ -261,16 +262,6 @@ sealed class TrayApp : ApplicationContext
         old?.Dispose();
         if (_iconHandle != IntPtr.Zero) DestroyIcon(_iconHandle);
         _iconHandle = handle;
-    }
-
-    static Bitmap Swatch(byte r, byte g, byte b)
-    {
-        var bmp = new Bitmap(16, 16);
-        using var gr = Graphics.FromImage(bmp);
-        using var brush = new SolidBrush(Color.FromArgb(r, g, b));
-        gr.FillRectangle(brush, 1, 1, 14, 14);
-        gr.DrawRectangle(Pens.Gray, 1, 1, 13, 13);
-        return bmp;
     }
 
     void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
