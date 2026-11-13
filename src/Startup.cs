@@ -5,7 +5,7 @@ using System.Text;
 namespace RgbManager;
 
 /// <summary>
-/// Installation dans Program Files + lancement à l'ouverture de session via une tâche planifiée
+/// Dossier d'installation (Program Files, voir Installer) + lancement à l'ouverture de session via une tâche planifiée
 /// « avec les privilèges les plus élevés » (pas de fenêtre admin à chaque démarrage).
 /// </summary>
 static class Startup
@@ -15,11 +15,14 @@ static class Startup
     public static string InstallDir =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "RgbManager");
 
+    public static string InstalledExe => Path.Combine(InstallDir, "RgbManager.exe");
+
     public static bool IsAdmin() =>
         new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
 
+    /// <summary>Cet exe est-il celui de Program Files ? (pas l'exe téléchargé, ni celui de mise à jour posé à côté)</summary>
     public static bool IsInstalledCopy() =>
-        string.Equals(Path.GetFullPath(AppContext.BaseDirectory).TrimEnd('\\'), InstallDir.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+        string.Equals(Path.GetFullPath(Application.ExecutablePath), InstalledExe, StringComparison.OrdinalIgnoreCase);
 
     public static bool IsEnabled() => Run("schtasks.exe", $"/Query /TN \"{TaskName}\"") == 0;
 
@@ -63,22 +66,8 @@ static class Startup
     /// <summary>Lance l'appli via sa tâche planifiée (droits admin sans fenêtre UAC).</summary>
     public static bool RunTask() => Run("schtasks.exe", $"/Run /TN \"{TaskName}\"") == 0;
 
-    /// <summary>Copie l'appli dans Program Files (dossier protégé, modifiable seulement en admin) et active le démarrage auto.</summary>
-    public static string Install()
-    {
-        string source = AppContext.BaseDirectory;
-        Directory.CreateDirectory(InstallDir);
-        foreach (var file in IsInstalledCopy() ? Array.Empty<string>() : Directory.GetFiles(source))
-        {
-            string name = Path.GetFileName(file);
-            if (name.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase)) continue;
-            File.Copy(file, Path.Combine(InstallDir, name), overwrite: true);
-        }
-        string exe = Path.Combine(InstallDir, "RgbManager.exe");
-        Enable(exe);
-        Log.W($"Installé dans {InstallDir}");
-        return exe;
-    }
+    /// <summary>Arrête l'appli lancée par la tâche planifiée.</summary>
+    public static void EndTask() => Run("schtasks.exe", $"/End /TN \"{TaskName}\"");
 
     static string Escape(string s) => System.Security.SecurityElement.Escape(s);
 

@@ -98,6 +98,7 @@
     background: var(--pg-surface-2); font: 13.5px/1.6 var(--pg-mono);
   }
   .pg-end img { border-radius: 14px; }
+  .dl-meta { margin-top: 12px; font: 12px/1.4 var(--pg-mono); color: var(--pg-muted); min-height: 1.4em; }
 </style>
 </head>
 <body class="pg-page">
@@ -135,13 +136,14 @@
         <h1>Tout l'éclairage du PC, <span class="pg-grad">d'un seul clic</span>.</h1>
         <p class="pg-lead">Une icône près de l'horloge pour régler en même temps la carte mère, la RAM, le watercooling et le boîtier. Sans Armoury Crate, sans iCUE, sans OpenRGB : un seul petit exécutable, aucun service, aucune télémétrie.</p>
         <div class="pg-cta">
-          <a class="pg-btn pg-btn--primary" href="https://github.com/Ghermin/rgb-manager">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-            Code source
+          <a class="pg-btn pg-btn--primary" href="https://github.com/Ghermin/rgb-manager/releases/latest/download/RgbManager.exe">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+            Télécharger RgbManager.exe
           </a>
           <a class="pg-btn" href="#materiel">Matériel pris en charge</a>
         </div>
-        <p class="pg-meta">Windows 10 et 11 · 64 bits · .NET Framework 4.8 (déjà dans Windows) · GPL-2.0</p>
+        <p class="dl-meta" id="dl-meta"></p>
+        <p class="pg-meta">Windows 10 et 11 · 64 bits · s'installe et se met à jour tout seul · GPL-2.0</p>
       </div>
 
       <div class="tray" aria-label="Le menu de l'appli, ouvert depuis la zone de notification" role="img">
@@ -177,7 +179,7 @@
       <div class="pg-card"><h3><span class="dot"></span>Couleurs et effets</h3><p>Neuf couleurs prêtes ou une couleur au choix. Effets statique, respiration, arc-en-ciel ou éteint, avec luminosité et vitesse réglables.</p></div>
       <div class="pg-card"><h3><span class="dot"></span>Tout ensemble</h3><p>Carte mère, RAM, watercooling et ruban du boîtier changent en même temps. Chaque appareil peut être coupé séparément.</p></div>
       <div class="pg-card"><h3><span class="dot"></span>Surveille la pompe</h3><p>Si la pompe du watercooling passe sous 400 tr/min, l'appli rend aussitôt la main au boîtier Corsair. Les vitesses ne sont jamais modifiées.</p></div>
-      <div class="pg-card"><h3><span class="dot"></span>Léger et discret</h3><p>Un seul exécutable, lancé avec Windows par une tâche planifiée, sans fenêtre UAC. Il reprend tout seul après la veille.</p></div>
+      <div class="pg-card"><h3><span class="dot"></span>Léger et discret</h3><p>Un seul exécutable, lancé avec Windows par une tâche planifiée, sans fenêtre UAC. Il reprend tout seul après la veille et se met à jour tout seul.</p></div>
     </div>
   </section>
 
@@ -201,30 +203,47 @@
 
   <section class="pg-section" id="installer">
     <p class="pg-kicker">Installer</p>
-    <h2>Compilé sur votre PC</h2>
-    <p class="pg-section__lead">Pas de Visual Studio ni de .NET SDK : le compilateur C# fourni avec PowerShell 7 suffit.</p>
+    <h2>Un exe, il s'installe tout seul</h2>
+    <p class="pg-section__lead">Rien à compiler, rien d'autre à installer : .NET Framework 4.8 est déjà dans Windows 10 et 11.</p>
     <div class="pg-grid pg-steps">
-      <div class="pg-card"><h3>Préparer</h3><p>Installez <a href="https://aka.ms/powershell">PowerShell 7</a>, et <a href="https://github.com/namazso/PawnIO.Setup/releases">PawnIO</a> si vous voulez piloter la RAM.</p></div>
-      <div class="pg-card"><h3>Récupérer</h3><p>Téléchargez ou clonez le <a href="https://github.com/Ghermin/rgb-manager">code source</a> depuis GitHub.</p></div>
-      <div class="pg-card"><h3>Installer</h3><p>Dans le dossier, lancez la commande ci-dessous et acceptez les droits administrateur une fois.</p><pre><code>pwsh -File deploy.ps1 -Build</code></pre></div>
+      <div class="pg-card"><h3>Télécharger</h3><p><a href="https://github.com/Ghermin/rgb-manager/releases/latest/download/RgbManager.exe">RgbManager.exe</a>, la dernière version publiée sur GitHub.</p></div>
+      <div class="pg-card"><h3>Lancer</h3><p>Acceptez la fenêtre administrateur, une seule fois. L'appli s'installe, se lance avec Windows et met son icône près de l'horloge.</p></div>
+      <div class="pg-card"><h3>PawnIO</h3><p>Pour la RAM, l'appli propose d'installer <a href="https://pawnio.eu">PawnIO</a> s'il manque : installateur officiel, signature vérifiée.</p></div>
     </div>
-    <p class="pg-note warn"><strong>Avant de lancer :</strong> fermez Armoury Crate, iCUE et OpenRGB, qui se disputeraient les mêmes appareils. L'appli s'installe dans <code>C:\Program Files\RgbManager</code>, avec un raccourci « Gestionnaire RGB » sur le Bureau.</p>
+    <p class="pg-note warn"><strong>Avant de lancer :</strong> fermez Armoury Crate, iCUE et OpenRGB, qui se disputeraient les mêmes appareils. Si SmartScreen affiche « Windows a protégé votre ordinateur » (l'exe n'est pas signé) : <em>Informations complémentaires → Exécuter quand même</em>.</p>
+    <p class="pg-note"><strong>Ensuite :</strong> les mises à jour s'installent toutes seules (vérifiées au lancement puis toutes les 6 heures). Pour désinstaller : Paramètres → Applications → Gestionnaire RGB. L'appli vit dans <code>C:\Program Files\RgbManager</code>, son journal et ses réglages dans <code>C:\ProgramData\RgbManager</code>.</p>
   </section>
 
   <section class="pg-end">
     <img src="icon.png" alt="" width="56" height="56">
     <h2>Un PC qui brille, sans trois logiciels pour ça.</h2>
     <div class="pg-cta">
-      <a class="pg-btn pg-btn--primary" href="https://github.com/Ghermin/rgb-manager">Voir le code source</a>
+      <a class="pg-btn pg-btn--primary" href="https://github.com/Ghermin/rgb-manager/releases/latest/download/RgbManager.exe">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        Télécharger RgbManager.exe
+      </a>
+      <a class="pg-btn" href="https://github.com/Ghermin/rgb-manager">Code source</a>
     </div>
   </section>
 </main>
 
 <footer class="pg-foot">
   <div class="pg-foot__in">
-    <p><a href="https://github.com/Ghermin/rgb-manager">Code source</a> · <a href="https://github.com/Ghermin/rgb-manager/issues">Signaler un problème</a> · Protocoles tirés d'<a href="https://gitlab.com/CalcProgrammer1/OpenRGB">OpenRGB</a></p>
+    <p><a href="https://github.com/Ghermin/rgb-manager">Code source</a> · <a href="https://github.com/Ghermin/rgb-manager/releases">Toutes les versions</a> · <a href="https://github.com/Ghermin/rgb-manager/issues">Signaler un problème</a> · Protocoles tirés d'<a href="https://gitlab.com/CalcProgrammer1/OpenRGB">OpenRGB</a></p>
     <p>Un projet du <a href="https://ghermin.github.io/">Bored Dev Playground</a>, par <a href="https://github.com/Ghermin">Ghermin</a></p>
   </div>
 </footer>
+<script>
+  // Version, date et taille de la dernière version, depuis GitHub.
+  fetch('https://api.github.com/repos/Ghermin/rgb-manager/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(rel => {
+      const exe = rel.assets.find(a => a.name === 'RgbManager.exe');
+      if (!exe) return;
+      const date = new Date(rel.published_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+      document.getElementById('dl-meta').textContent = `${rel.tag_name} · ${Math.round(exe.size / 1024)} Ko · ${date}`;
+    })
+    .catch(() => {});
+</script>
 </body>
 </html>

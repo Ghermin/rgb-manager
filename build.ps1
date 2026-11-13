@@ -12,12 +12,12 @@ Add-Type -AssemblyName Microsoft.CodeAnalysis, Microsoft.CodeAnalysis.CSharp
 
 $parse = [Microsoft.CodeAnalysis.CSharp.CSharpParseOptions]::new([Microsoft.CodeAnalysis.CSharp.LanguageVersion]::Latest)
 [Microsoft.CodeAnalysis.SyntaxTree[]]$trees = Get-ChildItem $src -Filter *.cs | ForEach-Object {
-    [Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree]::ParseText([IO.File]::ReadAllText($_.FullName), $parse, $_.FullName, [Text.Encoding]::UTF8, [Threading.CancellationToken]::None)
+    [Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree]::ParseText([IO.File]::ReadAllText($_.FullName), $parse, "src\$($_.Name)", [Text.Encoding]::UTF8, [Threading.CancellationToken]::None)
 }
 
 # Références : les assemblys de .NET Framework 4.8 installées avec Windows
 $fx = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
-[Microsoft.CodeAnalysis.MetadataReference[]]$refs = 'mscorlib', 'System', 'System.Core', 'System.Drawing', 'System.Windows.Forms', 'System.Security' |
+[Microsoft.CodeAnalysis.MetadataReference[]]$refs = 'mscorlib', 'System', 'System.Core', 'System.Drawing', 'System.Windows.Forms', 'System.Security', 'System.Web.Extensions' |
     ForEach-Object { [Microsoft.CodeAnalysis.MetadataReference]::CreateFromFile("$fx\$_.dll") }
 
 $options = [Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions]::new([Microsoft.CodeAnalysis.OutputKind]::WindowsApplication).
@@ -32,12 +32,17 @@ $icon = [IO.File]::OpenRead((Join-Path $root 'assets\icon.ico'))
 try { $win32 = $compilation.CreateDefaultWin32Resources($true, $false, $manifest, $icon) }
 finally { $manifest.Dispose(); $icon.Dispose() }
 
+# Module SMBus signé de PawnIO, embarqué dans l'exe (ressource) : un seul fichier à télécharger
+$moduleBytes = [IO.File]::ReadAllBytes((Join-Path $root 'vendor\pawnio\SmbusPIIX4.bin'))
+[Microsoft.CodeAnalysis.ResourceDescription[]]$resources = [Microsoft.CodeAnalysis.ResourceDescription]::new(
+    'SmbusPIIX4.bin', [Func[IO.Stream]] { [IO.MemoryStream]::new($moduleBytes, $false) }.GetNewClosure(), $false)
+
 $exe = Join-Path $out 'RgbManager.exe'
 $pe = [IO.File]::Create($exe)
-try { $result = $compilation.Emit($pe, $null, $null, $win32) } finally { $pe.Dispose() }
+try { $result = $compilation.Emit($pe, $null, $null, $win32, $resources) } finally { $pe.Dispose() }
 
 $result.Diagnostics | Where-Object { $_.Severity -ge [Microsoft.CodeAnalysis.DiagnosticSeverity]::Warning } | ForEach-Object { Write-Host $_.ToString() }
 if (-not $result.Success) { Remove-Item $exe -EA SilentlyContinue; throw "Échec de la compilation" }
 
-Copy-Item (Join-Path $root 'vendor\pawnio\SmbusPIIX4.bin') $out -Force
+Remove-Item (Join-Path $out 'SmbusPIIX4.bin') -EA SilentlyContinue # embarqué depuis la 1.3
 Write-Host "OK : $exe"

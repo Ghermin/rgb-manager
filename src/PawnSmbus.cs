@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace RgbManager;
 
 /// <summary>
-/// Accès au bus SMBus AMD (PIIX4) via le pilote PawnIO et son module signé SmbusPIIX4.bin.
+/// Accès au bus SMBus AMD (PIIX4) via le pilote PawnIO et son module signé SmbusPIIX4.bin (embarqué dans l'exe).
 /// Toutes les opérations prennent le mutex SMBus global partagé par les outils de monitoring
 /// (HWiNFO, LibreHardwareMonitor…), et remettent le port SMBus d'origine après usage.
 /// </summary>
@@ -31,6 +31,9 @@ sealed class PawnSmbus : IDisposable
         yield return Path.Combine(AppContext.BaseDirectory, "PawnIOLib.dll");
     }
 
+    /// <summary>PawnIO est-il installé ? (sa bibliothèque est présente)</summary>
+    public static bool IsInstalled() => LibCandidates().Any(File.Exists);
+
     readonly IntPtr _handle;
     readonly Mutex _mutex;
     readonly int _port;
@@ -45,15 +48,12 @@ sealed class PawnSmbus : IDisposable
     /// <summary>Ouvre PawnIO, charge le module PIIX4 et cible le port SMBus indiqué (0 = bus principal, celui de la RAM).</summary>
     public static PawnSmbus Open(int port = 0)
     {
-        string module = Path.Combine(AppContext.BaseDirectory, "SmbusPIIX4.bin");
-        if (!File.Exists(module)) throw new FileNotFoundException("Module SmbusPIIX4.bin manquant", module);
-
         int hr;
         try
         {
             hr = pawnio_open(out IntPtr h);
             if (hr != 0) throw new Win32Exception(hr, $"PawnIO : ouverture impossible (0x{hr:X8})");
-            byte[] blob = File.ReadAllBytes(module);
+            byte[] blob = Embedded.SmbusPIIX4; // vendor\pawnio\SmbusPIIX4.bin, embarqué par build.ps1
             hr = pawnio_load(h, blob, (UIntPtr)blob.Length);
             if (hr != 0)
             {

@@ -31,6 +31,25 @@ static class SingleInstance
         }
     }
 
+    const string QuitName = @"Local\RgbManager.Quit";
+
+    /// <summary>Demande à l'instance qui tourne de se fermer proprement (installation d'une nouvelle version).</summary>
+    public static void SignalQuit()
+    {
+        try
+        {
+            using var ev = EventWaitHandle.OpenExisting(QuitName);
+            ev.Set();
+        }
+        catch
+        {
+            // Pas d'instance, ou une version qui ne connaît pas ce signal : l'installateur la fermera de force.
+        }
+    }
+
+    /// <summary>Événement de fermeture surveillé par l'instance principale (réservé à son utilisateur et aux admins).</summary>
+    public static EventWaitHandle CreateQuitEvent() => new(false, EventResetMode.AutoReset, QuitName);
+
     /// <summary>Crée l'événement que l'instance principale surveille.</summary>
     public static EventWaitHandle CreateShowEvent()
     {

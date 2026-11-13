@@ -8,38 +8,45 @@ static class Program
     /// <summary>
     /// Sans argument : icône dans la barre des tâches.
     /// --test N   : applique les réglages pendant N secondes puis quitte (rend le watercooling au mode matériel).
-    /// --install  : copie dans Program Files et active le lancement au démarrage.
+    /// Exe téléchargé (hors de Program Files), sans option : il s'installe puis se lance de là (voir Installer).
+    /// --updated  : idem sans aucune fenêtre (mise à jour automatique) ; --install : ancien nom, même effet.
+    /// --portable : ne pas s'installer, tourner depuis ici.
+    /// --uninstall : désinstalle (lancé par « Applications installées »).
     /// --no-elevate : ne pas redemander les droits admin.
     /// </summary>
     [STAThread]
     static int Main(string[] args)
     {
         bool admin = Startup.IsAdmin();
+        bool canElevate = !args.Contains("--no-elevate");
+
+        if (args.Contains("--uninstall"))
+        {
+            if (!admin) return canElevate && Elevate(args) ? 0 : 1;
+            return Installer.Uninstall();
+        }
+
+        if (args.All(a => a is "--no-elevate" or "--updated" or "--install") && !Startup.IsInstalledCopy())
+        {
+            bool silent = args.Contains("--updated");
+            if (admin) return Installer.Install(silent);
+            if (canElevate && Elevate(args)) return 0;
+            if (!silent)
+                MessageBox.Show("L'installation a besoin des droits administrateur, une seule fois : relancez RgbManager.exe et acceptez la fenêtre Windows.",
+                    "Gestionnaire RGB", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return 1;
+        }
+
         bool trayMode = args.All(a => a == "--no-elevate");
 
         // Déjà lancée : on lui demande d'ouvrir son menu, sans rien relancer
         if (trayMode && SingleInstance.SignalExisting()) return 0;
 
         // Lancement normal (raccourci) : passer par la tâche planifiée, qui a déjà les droits admin → pas de fenêtre UAC
-        if (trayMode && !admin && !args.Contains("--no-elevate") && Startup.IsEnabled() && Startup.RunTask()) return 0;
+        if (trayMode && !admin && canElevate && Startup.IsEnabled() && Startup.RunTask()) return 0;
 
-        if (!admin && !args.Contains("--no-elevate"))
-        {
-            try
-            {
-                var psi = new ProcessStartInfo(Application.ExecutablePath, string.Join(" ", args.Append("--no-elevate").Select(a => $"\"{a}\"")))
-                {
-                    UseShellExecute = true,
-                    Verb = "runas",
-                };
-                Process.Start(psi);
-                return 0;
-            }
-            catch (Win32Exception)
-            {
-                // Fenêtre admin refusée : on continue sans la RAM.
-            }
-        }
+        // Fenêtre admin refusée : on continue sans la RAM.
+        if (!admin && canElevate && Elevate(args)) return 0;
 
         Log.W($"--- Démarrage v{typeof(Program).Assembly.GetName().Version} (admin : {admin}) {string.Join(" ", args)}");
         Log.W($"    utilisateur {System.Security.Principal.WindowsIdentity.GetCurrent().Name}, 64 bits {Environment.Is64BitProcess}, exe {Application.ExecutablePath}, dossier courant {Environment.CurrentDirectory}");
@@ -92,15 +99,26 @@ static class Program
             return 0;
         }
 
-        if (args.Contains("--install"))
-        {
-            if (!admin) return 1;
-            string exe = Startup.Install();
-            Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
-            return 0;
-        }
-
         return RunTray(admin);
+    }
+
+    /// <summary>Se relance en admin (fenêtre UAC) avec les mêmes options. Renvoie false si la fenêtre est refusée.</summary>
+    static bool Elevate(string[] args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo(Application.ExecutablePath, string.Join(" ", args.Append("--no-elevate").Select(a => $"\"{a}\"")))
+            {
+                UseShellExecute = true,
+                Verb = "runas",
+            };
+            Process.Start(psi);
+            return true;
+        }
+        catch (Win32Exception)
+        {
+            return false;
+        }
     }
 
     /// <summary>

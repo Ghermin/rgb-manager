@@ -27,6 +27,8 @@ sealed class TrayApp : ApplicationContext
     readonly ToolStripMenuItem _statusRam = new() { Enabled = false };
     readonly ToolStripMenuItem _statusCc = new() { Enabled = false };
     IntPtr _iconHandle;
+    readonly System.Windows.Forms.Timer _updateTimer = new() { Interval = 2 * 60 * 1000 };
+    bool _checkingUpdate;
 
     public TrayApp(bool admin)
     {
@@ -54,12 +56,54 @@ sealed class TrayApp : ApplicationContext
             while (showEvent.WaitOne()) _ui.BeginInvoke(ShowMenu);
         }) { IsBackground = true, Name = "Raccourci" }.Start();
 
+        // L'installateur d'une nouvelle version demande la fermeture : on rend la main proprement au matériel
+        var quitEvent = SingleInstance.CreateQuitEvent();
+        new Thread(() =>
+        {
+            quitEvent.WaitOne();
+            Log.W("Fermeture demandée par l'installateur");
+            _ui.BeginInvoke(ExitThread);
+        }) { IsBackground = true, Name = "Fermeture" }.Start();
+
+        // Mises à jour automatiques : 2 min après le lancement, puis toutes les 6 h
+        if (Updater.Enabled)
+        {
+            _updateTimer.Tick += (_, _) => CheckForUpdate();
+            _updateTimer.Start();
+        }
+
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         SystemEvents.SessionEnding += OnSessionEnding;
 
         _engine.Start();
         if (!admin)
             _tray.ShowBalloonTip(6000, "Gestionnaire RGB", "Lancé sans droits admin : la RAM ne sera pas pilotée.", ToolTipIcon.Info);
+    }
+
+    void CheckForUpdate()
+    {
+        _updateTimer.Interval = 6 * 3600 * 1000;
+        if (_checkingUpdate) return;
+        _checkingUpdate = true;
+        new Thread(() =>
+        {
+            Updater.CleanUp(); // exe de la mise à jour précédente
+            string exe = Updater.Fetch();
+            _ui.BeginInvoke(() =>
+            {
+                _checkingUpdate = false;
+                if (exe == null) return;
+                try
+                {
+                    Updater.Apply(exe); // il attend notre fermeture, s'installe et relance l'appli
+                    ExitThread();
+                }
+                catch (Exception ex)
+                {
+                    Log.W($"Mise à jour : lancement impossible : {ex.Message}");
+                }
+            });
+        }) { IsBackground = true, Name = "Mise à jour" }.Start();
     }
 
     void ShowMenu() =>
@@ -193,9 +237,9 @@ sealed class TrayApp : ApplicationContext
             }
             else
             {
-                // Installe d'abord dans Program Files : une tâche admin ne doit pas lancer un exe modifiable par n'importe quel programme.
-                string exe = Startup.Install();
-                _tray.ShowBalloonTip(5000, "Gestionnaire RGB", $"Installé dans {Path.GetDirectoryName(exe)} et lancé au démarrage.", ToolTipIcon.Info);
+                // Copie portable : une tâche admin ne doit pas lancer un exe modifiable par n'importe quel programme.
+                MessageBox.Show("Cette copie tourne sans être installée (--portable). Lancez RgbManager.exe sans option pour l'installer : le démarrage avec Windows sera activé.",
+                    "Gestionnaire RGB");
             }
         }
         catch (Exception ex)
@@ -275,6 +319,7 @@ sealed class TrayApp : ApplicationContext
     {
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         SystemEvents.SessionEnding -= OnSessionEnding;
+        _updateTimer.Dispose();
         _engine.Stop();
         _tray.Visible = false;
         _tray.Dispose();

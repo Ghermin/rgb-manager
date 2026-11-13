@@ -1,0 +1,52 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build
+        shell: pwsh
+        run: ./build.ps1
+      - name: Version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $v = [Reflection.AssemblyName]::GetAssemblyName("$PWD/out/RgbManager.exe").Version
+          $exe = "$($v.Major).$($v.Minor).$($v.Build)"
+          $tag = "$env:GITHUB_REF_NAME".TrimStart('v')
+          if ($exe -ne $tag) { Write-Error "Étiquette v$tag mais AssemblyVersion $exe dans src/Compat.cs"; exit 1 }
+      - uses: actions/upload-artifact@v5
+        with:
+          name: RgbManager
+          path: out/RgbManager.exe
+          if-no-files-found: error
+
+  release:
+    name: GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: RgbManager
+          path: dist
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --title "Gestionnaire RGB $GITHUB_REF_NAME" \
+            --notes "Télécharge \`RgbManager.exe\` et lance-le : il s'installe tout seul (une fenêtre administrateur), puis se met à jour tout seul. Page : https://ghermin.github.io/rgb-manager/" \
+            dist/RgbManager.exe

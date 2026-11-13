@@ -6,11 +6,16 @@ Appli Windows (zone de notification) qui pilote l'éclairage RGB en mode direct.
 
 - `pwsh -File build.ps1` → `out\RgbManager.exe`. Compilateur = Roslyn embarqué dans **PowerShell 7 64 bits** (`C:\Program Files\PowerShell\7\pwsh.exe`), cible **.NET Framework 4.8**. Pas de .NET SDK ni Visual Studio sur ce PC : ne pas créer de `.csproj`.
 - Conséquence .NET 4.8 : pas de `System.Text.Json`, `Math.Clamp`, `NativeLibrary`, plages `a[1..]`, `Environment.ProcessPath` → utiliser `Compat.cs`. La syntaxe C# récente (switch expressions, patterns, raw strings, `global using`) fonctionne.
-- `pwsh -File deploy.ps1` (admin) : arrête la tâche, copie `out\` dans `C:\Program Files\RgbManager`, recrée la tâche planifiée `RgbManager`, relance, met à jour le raccourci du bureau.
+- L'exe est autonome (module `SmbusPIIX4.bin` embarqué en ressource par `build.ps1`) et **s'installe tout seul** comme Averse / CamTel : lancé hors de `C:\Program Files\RgbManager` sans option, il demande l'UAC, ferme la version installée (signal `Local\RgbManager.Quit`, puis de force), se copie, recrée la tâche planifiée `RgbManager`, les raccourcis Bureau + menu Démarrer, l'entrée de désinstallation (HKLM, `--uninstall`), propose PawnIO (installateur officiel téléchargé depuis `namazso/PawnIO.Setup`, signature `CN=namazso.eu` vérifiée) puis relance via la tâche. Code : `src/Installer.cs`. `--portable` évite l'installation.
+- Mises à jour : `src/Updater.cs` (2 min après le lancement puis toutes les 6 h, seulement la copie installée en admin) télécharge `RgbManager.exe` de la dernière release dans le dossier d'installation (réservé aux admins, jamais `%TEMP%` : l'exe sera lancé en admin), vérifie taille + SHA-256, le lance avec `--updated` (installation sans fenêtre) et se ferme.
+- Publier une version : `AssemblyVersion` dans `src/Compat.cs`, commit, étiquette `vX.Y.Z` poussée → `.github/workflows/build.yml` compile, vérifie que l'étiquette = la version de l'exe, crée la release avec `RgbManager.exe`.
+- `pwsh -File deploy.ps1` : lance `out\RgbManager.exe --updated` (une fenêtre UAC, puis installation silencieuse).
+- Pas de TargetFramework dans l'exe → .NET 4.8 n'active pas TLS 1.2 tout seul : `GitHub.cs` le force. JSON : `JavaScriptSerializer` (System.Web.Extensions). Ne pas utiliser `dynamic` (pas de Microsoft.CSharp référencé).
 - Le PowerShell par défaut de cette machine est **32 bits** : passer par `C:\Program Files\PowerShell\7\pwsh.exe` pour tout ce qui touche au 64 bits (registre, `System32`, modules de processus).
 
 ## Tester
 
+- `out\RgbManager.exe` lancé sans option **s'installe** : pour un essai, passer une option (`--test N`, `--portable --no-elevate`…).
 - Arrêter l'appli installée : `schtasks /End /TN RgbManager` ; la relancer : `schtasks /Run /TN RgbManager`.
 - Journal : `C:\ProgramData\RgbManager\log.txt` (une exécution non admin écrit dans `%TEMP%\RgbManager-log.txt`).
 - HID (carte mère, Commander CORE) : testable sans admin avec `--no-elevate`. RAM : admin obligatoire (PawnIO).

@@ -4,7 +4,7 @@
 
 Petit gestionnaire d'éclairage RGB pour Windows, **sans Armoury Crate, iCUE ni OpenRGB** : une icône dans la zone de notification pour régler la couleur et l'effet de la carte mère, de la RAM, du watercooling et du boîtier en même temps.
 
-- Un seul exécutable de ~60 Ko, basé sur **.NET Framework 4.8** (inclus dans Windows 10/11, rien à installer).
+- Un seul exécutable de ~150 Ko qui **s'installe et se met à jour tout seul**, basé sur **.NET Framework 4.8** (inclus dans Windows 10/11, rien d'autre à installer).
 - Aucun service en arrière-plan, aucune télémétrie, aucun pilote vulnérable : la RAM passe par [PawnIO](https://pawnio.eu), le remplaçant signé et sécurisé de WinRing0.
 - Démarre avec Windows via une tâche planifiée (droits admin sans fenêtre UAC).
 
@@ -32,13 +32,21 @@ Pas pris en charge (pour l'instant) : autres cartes mères, RAM DDR5 ou d'autres
 
 ## Installation
 
-Prérequis : Windows 10/11 64 bits, [PawnIO](https://github.com/namazso/PawnIO.Setup/releases) installé (uniquement pour la RAM), [PowerShell 7](https://aka.ms/powershell) pour compiler.
+**Windows 10/11 64 bits** : télécharge
+[`RgbManager.exe`](https://github.com/Ghermin/rgb-manager/releases/latest/download/RgbManager.exe) et lance-le.
 
-```powershell
-pwsh -File deploy.ps1 -Build
-```
+- Si SmartScreen affiche « Windows a protégé votre ordinateur » (l'exe n'est pas signé) :
+  **Informations complémentaires → Exécuter quand même**.
+- Accepte la fenêtre administrateur (une seule fois) : l'appli s'installe dans `C:\Program Files\RgbManager`,
+  crée la tâche de démarrage (droits admin sans fenêtre UAC ensuite), les raccourcis « Gestionnaire RGB »
+  (Bureau et menu Démarrer) et une entrée dans **Paramètres → Applications** pour la désinstaller.
+- Si [PawnIO](https://pawnio.eu) manque (il ne sert qu'à la RAM), elle propose de télécharger son installateur
+  officiel, vérifie sa signature et le lance.
+- Avant : ferme Armoury Crate, iCUE et OpenRGB, qui se disputeraient les mêmes appareils.
 
-Ce script compile, installe dans `C:\Program Files\RgbManager`, crée la tâche de démarrage et le raccourci « Gestionnaire RGB » sur le bureau. Il demande les droits admin une fois.
+**Mises à jour** : automatiques. L'appli vérifie 2 min après son lancement puis toutes les 6 h, télécharge la
+nouvelle version (taille et SHA-256 vérifiés), se ferme proprement et se relance à jour. Le lien ci-dessus donne
+toujours la dernière version.
 
 Le journal et les réglages sont dans `C:\ProgramData\RgbManager\`.
 
@@ -47,10 +55,14 @@ Le journal et les réglages sont dans `C:\ProgramData\RgbManager\`.
 Pas besoin de Visual Studio ni du .NET SDK : `build.ps1` utilise le compilateur C# (Roslyn) fourni avec PowerShell 7 et compile contre .NET Framework 4.8.
 
 ```powershell
-pwsh -File build.ps1        # → out\RgbManager.exe
-pwsh -File deploy.ps1       # installe out\ et relance l'appli
+pwsh -File build.ps1        # → out\RgbManager.exe (module PawnIO embarqué)
+pwsh -File deploy.ps1       # installe out\RgbManager.exe sans message et relance l'appli
 pwsh -File assets\make-icon.ps1   # régénère l'icône
 ```
+
+Publier une version : changer `AssemblyVersion` dans `src/Compat.cs`, commiter, puis pousser l'étiquette
+correspondante (`git tag v1.3.0 && git push origin main v1.3.0`). GitHub Actions compile et crée la release avec
+`RgbManager.exe` ; les copies installées se mettent à jour toutes seules.
 
 Options de l'exécutable, utiles pour tester :
 
@@ -60,9 +72,12 @@ Options de l'exécutable, utiles pour tester :
 | `--aura-probe [s]` | Couleur différente sur chaque sortie de la carte mère (identifier où est branché un ruban) |
 | `--aura-probe2 [s]` | Alterne mode direct / effet statique / effet animé |
 | `--argb-count` | Bandes de couleurs sur 60 LED pour mesurer un ruban |
+| `--portable` | Tourner depuis ici, sans s'installer |
+| `--updated` | S'installer sans aucune fenêtre (utilisé par la mise à jour et `deploy.ps1`) |
+| `--uninstall` | Désinstaller (utilisé par Paramètres → Applications) |
 | `--no-elevate` | Ne pas redemander les droits admin |
 
-Arrêter l'appli installée avant un test : `schtasks /End /TN RgbManager`.
+Lancé sans option depuis `out\`, l'exe s'installe : pour un essai, passer une option (`--test`, `--portable`…). Arrêter l'appli installée avant un test : `schtasks /End /TN RgbManager`.
 
 ```
 src/              code C# (.NET Framework 4.8)
@@ -73,6 +88,8 @@ src/              code C# (.NET Framework 4.8)
   PawnSmbus.cs      accès SMBus via PawnIO
   HidDevice.cs      HID brut (setupapi / hid.dll)
   TrayApp.cs        icône et menu
+  Installer.cs      installation, désinstallation, PawnIO
+  Updater.cs        mises à jour depuis les releases GitHub
 vendor/pawnio/    module SMBus PIIX4 signé de PawnIO (LGPL-2.1)
 assets/           icône + script de génération
 docs/             notes matériel et protocoles
@@ -80,7 +97,7 @@ docs/             notes matériel et protocoles
 
 ## Dépannage
 
-- **La RAM ne change pas** : PawnIO est-il installé ? L'appli tourne-t-elle en admin (lancée par la tâche planifiée) ? Voir le journal.
+- **La RAM ne change pas** : PawnIO est-il installé (Paramètres → Applications) ? L'appli tourne-t-elle en admin (lancée par la tâche planifiée) ? Voir le journal.
 - **Le ruban du boîtier reste éteint ou blanc** : dans le BIOS, *Advanced → Onboard Devices Configuration → RGB LED lighting* doit être activé ; le contrôleur du boîtier doit être en mode « carte mère » (sur une Pure Base 500DX : appui long de 3 s sur le bouton LED) et son câble 3 broches branché sur la prise **ADD_GEN2**.
 - **Les effets « matériels » ne s'affichent pas** : c'est normal sur ce matériel, d'où le mode direct.
 
