@@ -17,41 +17,36 @@
 <meta property="og:url" content="https://ghermin.github.io/rgb-manager/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,200..800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="playground.css">
 <style>
   :root {
     --pg-bg: #f5f6f8; --pg-surface: #ffffff; --pg-surface-2: #eceef2; --pg-text: #121318; --pg-muted: #565a66;
     --pg-line: #dfe2e8; --pg-dot: rgba(18, 19, 24, .08);
-    --pg-accent: #2557e8; --pg-accent-2: #e0245e;
-    --r: #e0245e; --g: #13a35a; --b: #2557e8;
-    --pg-grad: linear-gradient(100deg, var(--r), var(--g) 50%, var(--b));
+    --pg-accent: #c2187a; --pg-accent-2: #3b5bf0;
     --menu-shadow: 0 24px 60px -24px rgba(18, 19, 24, .3);
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --pg-bg: #0c0d10; --pg-surface: #15161b; --pg-surface-2: #1d1f26; --pg-text: #eef0f5; --pg-muted: #9ea3b0;
       --pg-line: #272a33; --pg-dot: rgba(238, 240, 245, .06);
-      --pg-accent: #6f93ff; --pg-accent-2: #ff5c8a; --pg-on-accent: #ffffff;
-      --r: #ff5c7a; --g: #3ddc84; --b: #6f93ff;
+      --pg-accent: #ff5cae; --pg-accent-2: #6f8dff; --pg-on-accent: #ffffff;
       --menu-shadow: 0 24px 60px -20px rgba(0, 0, 0, .75);
     }
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
-  body { font-family: "Sora", system-ui, sans-serif; font-size: 16px; }
+  body { font-size: 16px; }
   a { color: var(--pg-accent); }
 
-  /* Halos rouge, vert, bleu derrière l'accroche, comme l'icône */
+  /* Halos magenta et bleu derrière l'accroche */
   .pg-hero { position: relative; }
   .pg-hero::before {
     content: ""; position: absolute; inset: -80px -20vw auto; height: 560px; z-index: -1; pointer-events: none;
     background:
-      radial-gradient(28% 40% at 22% 18%, color-mix(in srgb, var(--r) 16%, transparent), transparent 70%),
-      radial-gradient(28% 40% at 48% 8%, color-mix(in srgb, var(--g) 14%, transparent), transparent 70%),
-      radial-gradient(28% 40% at 74% 22%, color-mix(in srgb, var(--b) 16%, transparent), transparent 70%);
+      radial-gradient(30% 42% at 22% 18%, color-mix(in srgb, var(--pg-accent) 15%, transparent), transparent 70%),
+      radial-gradient(30% 42% at 74% 16%, color-mix(in srgb, var(--pg-accent-2) 16%, transparent), transparent 70%);
   }
-  .pg-btn--primary { background: var(--pg-text); color: var(--pg-bg); }
 
   /* Accroche sur deux colonnes : texte + menu de l'appli */
   .hero-grid { display: grid; gap: 48px; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); align-items: center; }
@@ -98,10 +93,6 @@
     .hw td { margin-top: 4px; }
   }
 
-  .pg-note.warn {
-    background: color-mix(in srgb, #d97706 9%, var(--pg-surface));
-    border-color: color-mix(in srgb, #d97706 35%, var(--pg-line));
-  }
   pre {
     margin: 14px 0 0; padding: 14px 16px; overflow-x: auto; border-radius: var(--pg-radius-sm);
     background: var(--pg-surface-2); font: 13.5px/1.6 var(--pg-mono);
