@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Gestionnaire RGB : l'éclairage du PC sans Armoury Crate ni iCUE</title>
-<meta name="description" content="Petit gestionnaire d'éclairage RGB pour Windows : carte mère ASUS AURA, RAM Corsair, watercooling Commander CORE et ruban du boîtier, depuis une icône près de l'horloge. Sans Armoury Crate, iCUE ni OpenRGB.">
+<meta name="description" content="Petit gestionnaire d'éclairage RGB pour Windows : carte mère ASUS AURA ou MSI Mystic Light, RAM Corsair ou Crucial Ballistix, watercooling Commander CORE, clavier Logitech et ruban du boîtier, depuis une icône près de l'horloge. Sans Armoury Crate, iCUE, MSI Center ni OpenRGB.">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0c0d10" media="(prefers-color-scheme: dark)">
@@ -134,7 +134,7 @@
           <ul class="pg-chips" role="list"><li>Windows</li><li>RGB</li><li>C#</li></ul>
         </div>
         <h1>Tout l'éclairage du PC, <span class="pg-grad">d'un seul clic</span>.</h1>
-        <p class="pg-lead">Une icône près de l'horloge pour régler en même temps la carte mère, la RAM, le watercooling et le boîtier. Sans Armoury Crate, sans iCUE, sans OpenRGB : un seul petit exécutable, aucun service, aucune télémétrie.</p>
+        <p class="pg-lead">Une icône près de l'horloge pour régler en même temps la carte mère, la RAM, le watercooling, le clavier et le boîtier. Sans Armoury Crate, sans iCUE, sans MSI Center, sans OpenRGB : un seul petit exécutable, aucun service, aucune télémétrie.</p>
         <div class="pg-cta">
           <a class="pg-btn pg-btn--primary" href="https://github.com/Ghermin/rgb-manager/releases/latest/download/RgbManager.exe">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
@@ -158,6 +158,7 @@
           <li class="sub">Effet</li>
           <li class="sub">Luminosité</li>
           <li class="sub">Vitesse des effets</li>
+          <li class="sub">Luminosité du clavier</li>
           <li class="sub">Appareils</li>
           <li class="sep"></li>
           <li class="on">Lancer au démarrage de Windows</li>
@@ -174,10 +175,10 @@
   <section class="pg-section" id="fonctions">
     <p class="pg-kicker">Fonctionnalités</p>
     <h2>Le nécessaire, rien de plus</h2>
-    <p class="pg-section__lead">L'appli calcule chaque image elle-même et l'envoie à chaque appareil en « mode direct » : tout est synchronisé, sans dépendre des effets intégrés au matériel.</p>
+    <p class="pg-section__lead">L'appli calcule chaque image elle-même et l'envoie à chaque appareil en « mode direct » : tout est synchronisé, sans dépendre des effets intégrés au matériel. Ceux qui ne le permettent pas (carte MSI, RAM Crucial, clavier) prennent la couleur choisie, fixe.</p>
     <div class="pg-grid features">
       <div class="pg-card"><h3><span class="dot"></span>Couleurs et effets</h3><p>Neuf couleurs prêtes ou une couleur au choix. Effets statique, respiration, arc-en-ciel ou éteint, avec luminosité et vitesse réglables.</p></div>
-      <div class="pg-card"><h3><span class="dot"></span>Tout ensemble</h3><p>Carte mère, RAM, watercooling et ruban du boîtier changent en même temps. Chaque appareil peut être coupé séparément.</p></div>
+      <div class="pg-card"><h3><span class="dot"></span>Tout ensemble</h3><p>Carte mère, RAM, watercooling, clavier et ruban du boîtier changent en même temps. Chaque appareil peut être coupé séparément, le clavier a sa propre luminosité.</p></div>
       <div class="pg-card"><h3><span class="dot"></span>Surveille la pompe</h3><p>Si la pompe du watercooling passe sous 400 tr/min, l'appli rend aussitôt la main au boîtier Corsair. Les vitesses ne sont jamais modifiées.</p></div>
       <div class="pg-card"><h3><span class="dot"></span>Léger et discret</h3><p>Un seul exécutable, lancé avec Windows par une tâche planifiée, sans fenêtre UAC. Il reprend tout seul après la veille et se met à jour tout seul.</p></div>
     </div>
@@ -185,20 +186,23 @@
 
   <section class="pg-section" id="materiel">
     <p class="pg-kicker">Matériel</p>
-    <h2>Écrit pour un PC précis</h2>
-    <p class="pg-section__lead">Sur un autre PC, l'appli n'allume que ce qu'elle reconnaît. Pour du matériel varié, <a href="https://openrgb.org">OpenRGB</a> reste la solution générique.</p>
+    <h2>Écrit pour deux PC précis</h2>
+    <p class="pg-section__lead">Le même exe sert sur les deux : il reconnaît tout seul le matériel de chacun. Sur un autre PC, il n'allume que ce qu'il reconnaît. Pour du matériel varié, <a href="https://openrgb.org">OpenRGB</a> reste la solution générique.</p>
     <div class="hw-wrap">
       <table class="hw">
         <thead><tr><th scope="col">Appareil</th><th scope="col">Pris en charge</th><th scope="col">Comment</th></tr></thead>
         <tbody>
           <tr><th scope="row">Carte mère ASUS</th><td>Contrôleur AURA USB <code>0B05:1939</code> (ex. ROG STRIX B550-A GAMING)</td><td>HID, mode direct : 2 prises RGB 12 V et 1 prise ARGB</td></tr>
+          <tr><th scope="row">Carte mère MSI</th><td>Contrôleur Mystic Light <code>1462:7C56</code> (B550-A PRO)</td><td>HID, couleur fixe sur toutes les zones, jamais écrite en mémoire flash</td></tr>
           <tr><th scope="row">RAM</th><td>Corsair DDR4 RGB (Dominator Platinum, Vengeance RGB Pro/SL/RS) sur chipset AMD</td><td>SMBus via <a href="https://pawnio.eu">PawnIO</a>, le remplaçant signé de WinRing0</td></tr>
+          <tr><th scope="row">RAM</th><td>Crucial Ballistix RGB DDR4 sur chipset AMD</td><td>SMBus via PawnIO, couleur fixe</td></tr>
           <tr><th scope="row">Watercooling</th><td>Corsair iCUE Commander CORE <code>1B1C:0C1C</code></td><td>HID, vitesses de la pompe et des ventilateurs jamais modifiées</td></tr>
+          <tr><th scope="row">Clavier</th><td>Logitech G513 <code>046D:C33C</code></td><td>HID++, couleur fixe, luminosité à part</td></tr>
           <tr><th scope="row">Boîtier</th><td>Ruban ARGB branché sur la carte mère (ex. be quiet! Pure Base 500DX)</td><td>Via la prise ARGB de la carte mère</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="pg-note">Pas pris en charge pour l'instant : autres cartes mères, RAM DDR5 ou d'autres marques, chipsets Intel, cartes graphiques, périphériques.</p>
+    <p class="pg-note">Pas pris en charge pour l'instant : autres cartes mères, RAM DDR5 ou d'autres marques, chipsets Intel, cartes graphiques, autres périphériques.</p>
   </section>
 
   <section class="pg-section" id="installer">
@@ -210,7 +214,7 @@
       <div class="pg-card"><h3>Lancer</h3><p>Acceptez la fenêtre administrateur, une seule fois. L'appli s'installe, se lance avec Windows et met son icône près de l'horloge.</p></div>
       <div class="pg-card"><h3>PawnIO</h3><p>Pour la RAM, l'appli propose d'installer <a href="https://pawnio.eu">PawnIO</a> s'il manque : installateur officiel, signature vérifiée.</p></div>
     </div>
-    <p class="pg-note warn"><strong>Avant de lancer :</strong> fermez Armoury Crate, iCUE et OpenRGB, qui se disputeraient les mêmes appareils. Si SmartScreen affiche « Windows a protégé votre ordinateur » (l'exe n'est pas signé) : <em>Informations complémentaires → Exécuter quand même</em>.</p>
+    <p class="pg-note warn"><strong>Avant de lancer :</strong> fermez Armoury Crate, iCUE, MSI Center, Logitech G HUB et OpenRGB, qui se disputeraient les mêmes appareils. Si SmartScreen affiche « Windows a protégé votre ordinateur » (l'exe n'est pas signé) : <em>Informations complémentaires → Exécuter quand même</em>.</p>
     <p class="pg-note"><strong>Ensuite :</strong> les mises à jour s'installent toutes seules (vérifiées au lancement puis toutes les 6 heures). Pour désinstaller : Paramètres → Applications → Gestionnaire RGB. L'appli vit dans <code>C:\Program Files\RgbManager</code>, son journal et ses réglages dans <code>C:\ProgramData\RgbManager</code>.</p>
   </section>
 

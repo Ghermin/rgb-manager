@@ -23,9 +23,11 @@ sealed class TrayApp : ApplicationContext
     readonly ContextMenuStrip _menu = new();
     readonly MenuTheme _theme = new();
     SwatchRow _swatches;
-    readonly ToolStripMenuItem _statusAura = new() { Enabled = false };
+    readonly ToolStripMenuItem _statusBoard = new() { Enabled = false };
     readonly ToolStripMenuItem _statusRam = new() { Enabled = false };
     readonly ToolStripMenuItem _statusCc = new() { Enabled = false };
+    readonly ToolStripMenuItem _statusKeyboard = new() { Enabled = false };
+    ToolStripMenuItem _keyboardBrightness;
     IntPtr _iconHandle;
     readonly System.Windows.Forms.Timer _updateTimer = new() { Interval = 2 * 60 * 1000 };
     bool _checkingUpdate;
@@ -137,11 +139,16 @@ sealed class TrayApp : ApplicationContext
             () => _settings.Brightness, v => Change(s => s.Brightness = v)));
         _menu.Items.Add(Choice("Vitesse des effets", new[] { ("Lente", 0), ("Moyenne", 1), ("Rapide", 2) },
             () => _settings.Speed, v => Change(s => s.Speed = v)));
+        // Un clavier éclaire de près : sa luminosité se règle à part (affiché seulement si un clavier est détecté)
+        _keyboardBrightness = Choice("Luminosité du clavier", new[] { ("Éteint", 0), ("25 %", 25), ("50 %", 50), ("75 %", 75), ("100 %", 100) },
+            () => _settings.KeyboardBrightness, v => Change(s => s.KeyboardBrightness = v));
+        _menu.Items.Add(_keyboardBrightness);
 
         var devices = new ToolStripMenuItem("Appareils");
-        devices.DropDownItems.Add(Toggle(_statusAura, () => _settings.Mainboard, v => Change(s => s.Mainboard = v)));
+        devices.DropDownItems.Add(Toggle(_statusBoard, () => _settings.Mainboard, v => Change(s => s.Mainboard = v)));
         devices.DropDownItems.Add(Toggle(_statusRam, () => _settings.Ram, v => Change(s => s.Ram = v)));
         devices.DropDownItems.Add(Toggle(_statusCc, () => _settings.Commander, v => Change(s => s.Commander = v)));
+        devices.DropDownItems.Add(Toggle(_statusKeyboard, () => _settings.Keyboard, v => Change(s => s.Keyboard = v)));
         _menu.Items.Add(devices);
         _menu.Items.Add(new ToolStripSeparator());
 
@@ -252,12 +259,15 @@ sealed class TrayApp : ApplicationContext
 
     void RefreshMenu()
     {
-        _statusAura.Text = _engine.AuraStatus;
+        _statusBoard.Text = _engine.BoardStatus;
         _statusRam.Text = _engine.RamStatus;
         _statusCc.Text = _engine.CommanderStatus;
-        _statusAura.Checked = _settings.Mainboard;
+        _statusKeyboard.Text = _engine.KeyboardStatus;
+        _statusBoard.Checked = _settings.Mainboard;
         _statusRam.Checked = _settings.Ram;
         _statusCc.Checked = _settings.Commander;
+        _statusKeyboard.Checked = _settings.Keyboard;
+        _keyboardBrightness.Visible = _engine.HasKeyboard;
 
         foreach (ToolStripItem i in _menu.Items)
             if (i is ToolStripMenuItem st && "startup".Equals(st.Tag))

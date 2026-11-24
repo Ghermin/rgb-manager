@@ -2,19 +2,19 @@
 
 # Gestionnaire RGB
 
-Petit gestionnaire d'éclairage RGB pour Windows, **sans Armoury Crate, iCUE ni OpenRGB** : une icône dans la zone de notification pour régler la couleur et l'effet de la carte mère, de la RAM, du watercooling et du boîtier en même temps.
+Petit gestionnaire d'éclairage RGB pour Windows, **sans Armoury Crate, iCUE, MSI Center ni OpenRGB** : une icône dans la zone de notification pour régler la couleur et l'effet de la carte mère, de la RAM, du watercooling, du clavier et du boîtier en même temps.
 
 - Un seul exécutable de ~150 Ko qui **s'installe et se met à jour tout seul**, basé sur **.NET Framework 4.8** (inclus dans Windows 10/11, rien d'autre à installer).
 - Aucun service en arrière-plan, aucune télémétrie, aucun pilote vulnérable : la RAM passe par [PawnIO](https://pawnio.eu), le remplaçant signé et sécurisé de WinRing0.
 - Démarre avec Windows via une tâche planifiée (droits admin sans fenêtre UAC).
 
-> ⚠️ Projet personnel, écrit pour un PC précis (voir [matériel pris en charge](#matériel-pris-en-charge)). Sur un autre PC, il n'allume que ce qu'il reconnaît. Pour du matériel varié, [OpenRGB](https://openrgb.org) est la solution générique.
+> ⚠️ Projet personnel, écrit pour deux PC précis (voir [matériel pris en charge](#matériel-pris-en-charge)) : le même exe reconnaît tout seul le matériel de chacun. Sur un autre PC, il n'allume que ce qu'il reconnaît. Pour du matériel varié, [OpenRGB](https://openrgb.org) est la solution générique.
 
 ## Fonctionnalités
 
 - Couleurs prédéfinies ou personnalisées, effets **statique**, **respiration**, **arc-en-ciel**, **éteint**
-- Luminosité et vitesse réglables, chaque appareil activable séparément
-- Tous les appareils animés ensemble (l'appli calcule chaque image en « mode direct »)
+- Luminosité et vitesse réglables, chaque appareil activable séparément, luminosité à part pour le clavier
+- Tous les appareils animés ensemble (l'appli calcule chaque image en « mode direct ») ; ceux qui ne le permettent pas (carte MSI, RAM Crucial, clavier) prennent la couleur choisie, fixe
 - **Surveillance de la pompe** du watercooling : si elle passe sous 400 tr/min, l'appli rend la main au boîtier Corsair
 - Reprise automatique après la veille, nouvelle tentative de détection si un appareil n'est pas prêt au démarrage
 - Relancer l'appli (raccourci du bureau) ouvre son menu
@@ -24,11 +24,16 @@ Petit gestionnaire d'éclairage RGB pour Windows, **sans Armoury Crate, iCUE ni 
 | Appareil | Pris en charge | Comment |
 |---|---|---|
 | Carte mère ASUS | Contrôleur AURA USB `0B05:1939` (ex. ROG STRIX B550-A GAMING) | HID, mode direct : 2 prises RGB 12 V + 1 prise ARGB (14 LED) |
+| Carte mère MSI | Contrôleur Mystic Light 185 octets `1462:7C56` (B550-A PRO) | HID (rapport feature `0x52`), couleur fixe sur toutes les zones, jamais écrite en flash |
 | RAM | Corsair DDR4 RGB (Dominator Platinum, Vengeance RGB Pro/SL/RS) sur chipset **AMD** | SMBus via PawnIO (module PIIX4), mode direct, adresses `0x58`–`0x5F` uniquement |
+| RAM | Crucial **Ballistix** RGB DDR4 sur chipset **AMD** | SMBus via PawnIO, couleur fixe, adresses `0x27`, `0x20`–`0x23`, `0x39`–`0x3C` uniquement, sondées seulement si Windows annonce de la Ballistix |
 | Watercooling | Corsair iCUE **Commander CORE** `1B1C:0C1C` (pompe + 6 ports ventilateurs) | HID, mode logiciel, vitesses jamais modifiées |
+| Clavier | Logitech **G513** `046D:C33C` | HID++ 2.0 (fonction `0x8070`), couleur fixe, sans persistance |
 | Boîtier | Ruban ARGB branché sur la prise ARGB de la carte mère (ex. be quiet! Pure Base 500DX) | Via la carte mère |
 
-Pas pris en charge (pour l'instant) : autres cartes mères, RAM DDR5 ou d'autres marques, chipsets Intel, cartes graphiques, périphériques.
+Pas pris en charge (pour l'instant) : autres cartes mères, RAM DDR5 ou d'autres marques, chipsets Intel, cartes graphiques, autres périphériques.
+
+Ce projet remplace aussi LED Control (script PowerShell pour le second PC) : au premier lancement, l'appli reprend ses réglages (`%APPDATA%\LedControl\settings.json`).
 
 ## Installation
 
@@ -42,7 +47,7 @@ Pas pris en charge (pour l'instant) : autres cartes mères, RAM DDR5 ou d'autres
   (Bureau et menu Démarrer) et une entrée dans **Paramètres → Applications** pour la désinstaller.
 - Si [PawnIO](https://pawnio.eu) manque (il ne sert qu'à la RAM), elle propose de télécharger son installateur
   officiel, vérifie sa signature et le lance.
-- Avant : ferme Armoury Crate, iCUE et OpenRGB, qui se disputeraient les mêmes appareils.
+- Avant : ferme Armoury Crate, iCUE, MSI Center, Logitech G HUB et OpenRGB, qui se disputeraient les mêmes appareils.
 
 **Mises à jour** : automatiques. L'appli vérifie 2 min après son lancement puis toutes les 6 h, télécharge la
 nouvelle version (taille et SHA-256 vérifiés), se ferme proprement et se relance à jour. Le lien ci-dessus donne

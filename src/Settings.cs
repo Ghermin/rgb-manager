@@ -17,6 +17,8 @@ sealed class Settings
     public bool Mainboard { get; set; } = true;
     public bool Ram { get; set; } = true;
     public bool Commander { get; set; } = true;
+    public bool Keyboard { get; set; } = true;
+    public int KeyboardBrightness { get; set; } = 100; // %, en plus de Brightness : un clavier éclaire de près
 
     static string FilePath => Path.Combine(Log.Dir, "settings.ini");
 
@@ -30,7 +32,7 @@ sealed class Settings
             {
                 // Récupère les réglages de l'ancien emplacement (%APPDATA%)
                 string legacy = Path.Combine(Log.LegacyDir, "settings.ini");
-                if (!File.Exists(legacy)) return s;
+                if (!File.Exists(legacy)) return FromLedControl() ?? s;
                 path = legacy;
                 Log.W($"Réglages repris depuis {legacy}");
             }
@@ -50,6 +52,8 @@ sealed class Settings
                     case "Mainboard": s.Mainboard = bool.Parse(value); break;
                     case "Ram": s.Ram = bool.Parse(value); break;
                     case "Commander": s.Commander = bool.Parse(value); break;
+                    case "Keyboard": s.Keyboard = bool.Parse(value); break;
+                    case "KeyboardBrightness": s.KeyboardBrightness = Compat.Clamp(int.Parse(value, CultureInfo.InvariantCulture), 0, 100); break;
                 }
             }
         }
@@ -69,7 +73,8 @@ sealed class Settings
             var sb = new StringBuilder();
             sb.AppendLine($"R={R}").AppendLine($"G={G}").AppendLine($"B={B}")
               .AppendLine($"Effect={Effect}").AppendLine($"Brightness={Brightness}").AppendLine($"Speed={Speed}")
-              .AppendLine($"Mainboard={Mainboard}").AppendLine($"Ram={Ram}").AppendLine($"Commander={Commander}");
+              .AppendLine($"Mainboard={Mainboard}").AppendLine($"Ram={Ram}").AppendLine($"Commander={Commander}")
+              .AppendLine($"Keyboard={Keyboard}").AppendLine($"KeyboardBrightness={KeyboardBrightness}");
             File.WriteAllText(FilePath, sb.ToString());
         }
         catch (Exception ex)
@@ -80,10 +85,40 @@ sealed class Settings
 
     public Settings Clone() => (Settings)MemberwiseClone();
 
-    /// <summary>Couleur multipliée par la luminosité.</summary>
-    public (byte R, byte G, byte B) ScaledColor()
+    /// <summary>
+    /// Premier lancement sur un PC qui utilisait LED Control (fusionné ici) : on reprend sa couleur et ses luminosités
+    /// (%APPDATA%\LedControl\settings.json : {"Color": "RRGGBB", "Brightness": n, "KeyboardBrightness": n}).
+    /// </summary>
+    static Settings FromLedControl()
+    {
+        try
+        {
+            string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "LedControl", "settings.json");
+            if (!File.Exists(path)) return null;
+            var json = (Dictionary<string, object>)new System.Web.Script.Serialization.JavaScriptSerializer().DeserializeObject(File.ReadAllText(path));
+            var s = new Settings();
+            if (json.TryGetValue("Color", out var c) && c is string hex && hex.Length == 6)
+            {
+                int rgb = int.Parse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                (s.R, s.G, s.B) = ((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);
+            }
+            if (json.TryGetValue("Brightness", out var b)) s.Brightness = Compat.Clamp(Convert.ToInt32(b, CultureInfo.InvariantCulture), 0, 100);
+            if (json.TryGetValue("KeyboardBrightness", out var k)) s.KeyboardBrightness = Compat.Clamp(Convert.ToInt32(k, CultureInfo.InvariantCulture), 0, 100);
+            Log.W($"Réglages repris de LED Control : couleur {s.R},{s.G},{s.B}, luminosité {s.Brightness} %, clavier {s.KeyboardBrightness} %");
+            return s;
+        }
+        catch (Exception ex)
+        {
+            Log.W($"Réglages de LED Control illisibles ({ex.Message})");
+            return null;
+        }
+    }
+
+    /// <summary>Couleur multipliée par la luminosité (et par celle du clavier, pour le clavier).</summary>
+    public (byte R, byte G, byte B) ScaledColor(bool keyboard = false)
     {
         double k = Compat.Clamp(Brightness, 0, 100) / 100.0;
+        if (keyboard) k *= Compat.Clamp(KeyboardBrightness, 0, 100) / 100.0;
         return ((byte)(R * k), (byte)(G * k), (byte)(B * k));
     }
 }

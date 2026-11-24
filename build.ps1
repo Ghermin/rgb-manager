@@ -17,7 +17,7 @@ $parse = [Microsoft.CodeAnalysis.CSharp.CSharpParseOptions]::new([Microsoft.Code
 
 # Références : les assemblys de .NET Framework 4.8 installées avec Windows
 $fx = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
-[Microsoft.CodeAnalysis.MetadataReference[]]$refs = 'mscorlib', 'System', 'System.Core', 'System.Drawing', 'System.Windows.Forms', 'System.Security', 'System.Web.Extensions' |
+[Microsoft.CodeAnalysis.MetadataReference[]]$refs = 'mscorlib', 'System', 'System.Core', 'System.Drawing', 'System.Windows.Forms', 'System.Security', 'System.Web.Extensions', 'System.Management', 'System.ServiceProcess' |
     ForEach-Object { [Microsoft.CodeAnalysis.MetadataReference]::CreateFromFile("$fx\$_.dll") }
 
 $options = [Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions]::new([Microsoft.CodeAnalysis.OutputKind]::WindowsApplication).

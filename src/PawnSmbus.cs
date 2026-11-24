@@ -12,7 +12,7 @@ sealed class PawnSmbus : IDisposable
 {
     const string Lib = "PawnIOLib";
     const string SmbusMutexName = @"Global\Access_SMBUS.HTP.Method";
-    const int I2C_SMBUS_READ = 1, I2C_SMBUS_WRITE = 0, I2C_SMBUS_BYTE_DATA = 2, I2C_SMBUS_WORD_DATA = 3, I2C_SMBUS_BLOCK_DATA = 5;
+    const int I2C_SMBUS_READ = 1, I2C_SMBUS_WRITE = 0, I2C_SMBUS_BYTE = 1, I2C_SMBUS_BYTE_DATA = 2, I2C_SMBUS_WORD_DATA = 3, I2C_SMBUS_BLOCK_DATA = 5;
 
     static PawnSmbus()
     {
@@ -112,6 +112,14 @@ sealed class PawnSmbus : IDisposable
         int hr = Exec("ioctl_piix4_port_sel", new[] { unchecked((ulong)(long)port) }, o);
         if (hr != 0) throw new IOException($"PawnIO : sélection du port SMBus {port} impossible (0x{hr:X8})");
         return unchecked((long)o[0]);
+    }
+
+    /// <summary>Lecture d'un octet sans registre (SMBus « read byte ») : sert à savoir si une adresse répond. -1 sinon.</summary>
+    public int ReadByte(byte address)
+    {
+        var o = new ulong[5];
+        int hr = Exec("ioctl_smbus_xfer", new ulong[] { address, I2C_SMBUS_READ, 0, I2C_SMBUS_BYTE }, o);
+        return hr == 0 ? (int)(o[0] & 0xFF) : -1;
     }
 
     /// <summary>Lecture d'un octet (SMBus « read byte data »). Retourne -1 si l'adresse ne répond pas.</summary>

@@ -13,15 +13,19 @@ sealed class HidDevice : IDisposable
     public string DevicePath { get; }
     public int InputLength { get; }
     public int OutputLength { get; }
+    public int FeatureLength { get; }
+    public ushort UsagePage { get; }
 
     readonly SafeFileHandle _handle;
 
-    HidDevice(string path, SafeFileHandle handle, int inputLength, int outputLength)
+    HidDevice(string path, SafeFileHandle handle, HIDP_CAPS caps)
     {
         DevicePath = path;
         _handle = handle;
-        InputLength = inputLength;
-        OutputLength = outputLength;
+        InputLength = caps.InputReportByteLength;
+        OutputLength = caps.OutputReportByteLength;
+        FeatureLength = caps.FeatureReportByteLength;
+        UsagePage = caps.UsagePage;
     }
 
     /// <summary>Chemins des interfaces HID présentes dont le chemin contient <paramref name="filter"/> (ex. "vid_0b05&amp;pid_1939&amp;mi_02").</summary>
@@ -81,7 +85,7 @@ sealed class HidDevice : IDisposable
         try
         {
             HidP_GetCaps(preparsed, out HIDP_CAPS caps);
-            return new HidDevice(path, handle, caps.InputReportByteLength, caps.OutputReportByteLength);
+            return new HidDevice(path, handle, caps);
         }
         finally
         {
@@ -99,6 +103,28 @@ sealed class HidDevice : IDisposable
         Array.Copy(data, report, Math.Min(data.Length, OutputLength));
         if (!Overlapped(write: true, report, timeoutMs, out _))
             throw new IOException("Écriture HID expirée");
+    }
+
+    /// <summary>
+    /// Lit le rapport « feature » <paramref name="reportId"/>. Windows exige un tampon de la taille
+    /// du plus grand rapport feature (<see cref="FeatureLength"/>) ; l'ID est en position 0.
+    /// </summary>
+    public byte[] GetFeature(byte reportId)
+    {
+        var buf = new byte[FeatureLength];
+        buf[0] = reportId;
+        if (!HidD_GetFeature(_handle, buf, buf.Length))
+            throw new Win32Exception(Marshal.GetLastWin32Error(), $"Lecture du rapport feature 0x{reportId:X2} impossible");
+        return buf;
+    }
+
+    /// <summary>Envoie un rapport « feature » (complété par des zéros jusqu'à <see cref="FeatureLength"/>).</summary>
+    public void SetFeature(byte[] data)
+    {
+        var buf = new byte[FeatureLength];
+        Array.Copy(data, buf, Math.Min(data.Length, buf.Length));
+        if (!HidD_SetFeature(_handle, buf, buf.Length))
+            throw new Win32Exception(Marshal.GetLastWin32Error(), $"Envoi du rapport feature 0x{buf[0]:X2} refusé");
     }
 
     /// <summary>Lit un rapport d'entrée, ou null si rien n'arrive avant le délai.</summary>
@@ -177,6 +203,8 @@ sealed class HidDevice : IDisposable
     [DllImport("hid.dll")] static extern bool HidD_FreePreparsedData(IntPtr preparsed);
     [DllImport("hid.dll")] static extern int HidP_GetCaps(IntPtr preparsed, out HIDP_CAPS caps);
     [DllImport("hid.dll")] static extern bool HidD_FlushQueue(SafeFileHandle h);
+    [DllImport("hid.dll", SetLastError = true)] static extern bool HidD_GetFeature(SafeFileHandle h, byte[] buffer, int length);
+    [DllImport("hid.dll", SetLastError = true)] static extern bool HidD_SetFeature(SafeFileHandle h, byte[] buffer, int length);
 
     [DllImport("setupapi.dll", SetLastError = true)]
     static extern IntPtr SetupDiGetClassDevs(ref Guid classGuid, IntPtr enumerator, IntPtr parent, int flags);

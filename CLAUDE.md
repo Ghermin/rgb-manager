@@ -1,30 +1,32 @@
 # Gestionnaire RGB : notes pour les sessions de développement
 
-Appli Windows (zone de notification) qui pilote l'éclairage RGB en mode direct. Voir `README.md` (usage) et `docs/HARDWARE.md` (matériel, protocoles, leçons apprises : à lire avant de toucher aux protocoles).
+Appli Windows (zone de notification) qui pilote l'éclairage RGB. Un seul exe pour les **deux PC** de l'utilisateur : il détecte le matériel de chacun (PC ASUS : AURA + RAM Corsair + Commander CORE ; PC MSI : Mystic Light + RAM Crucial Ballistix + clavier Logitech G513, ex-LED Control). Voir `README.md` (usage) et `docs/HARDWARE.md` (matériel, protocoles, leçons apprises : à lire avant de toucher aux protocoles).
 
 ## Compiler / installer
 
-- `pwsh -File build.ps1` → `out\RgbManager.exe`. Compilateur = Roslyn embarqué dans **PowerShell 7 64 bits** (`C:\Program Files\PowerShell\7\pwsh.exe`), cible **.NET Framework 4.8**. Pas de .NET SDK ni Visual Studio sur ce PC : ne pas créer de `.csproj`.
+- `pwsh -File build.ps1` → `out\RgbManager.exe`. Compilateur = Roslyn embarqué dans **PowerShell 7 64 bits** (`C:\Program Files\PowerShell\7\pwsh.exe`), cible **.NET Framework 4.8**. Ne pas créer de `.csproj`.
+- PC MSI : pas de PowerShell 7, mais le SDK .NET 8. Même compilation avec son Roslyn : `dotnet "C:\Program Files\dotnet\sdk\<version>\Roslyn\bincore\csc.dll"` et les options de `build.ps1` (`/target:winexe /platform:x64 /langversion:latest /nostdlib+`, références de `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319`, `/win32icon`, `/win32manifest`, `/resource:vendor\pawnio\SmbusPIIX4.bin,SmbusPIIX4.bin`). La CI (`build.yml`) reste la référence pour les releases.
 - Conséquence .NET 4.8 : pas de `System.Text.Json`, `Math.Clamp`, `NativeLibrary`, plages `a[1..]`, `Environment.ProcessPath` → utiliser `Compat.cs`. La syntaxe C# récente (switch expressions, patterns, raw strings, `global using`) fonctionne.
 - L'exe est autonome (module `SmbusPIIX4.bin` embarqué en ressource par `build.ps1`) et **s'installe tout seul** comme Averse / CamTel : lancé hors de `C:\Program Files\RgbManager` sans option, il demande l'UAC, ferme la version installée (signal `Local\RgbManager.Quit`, puis de force), se copie, recrée la tâche planifiée `RgbManager`, les raccourcis Bureau + menu Démarrer, l'entrée de désinstallation (HKLM, `--uninstall`), propose PawnIO (installateur officiel téléchargé depuis `namazso/PawnIO.Setup`, signature `CN=namazso.eu` vérifiée) puis relance via la tâche. Code : `src/Installer.cs`. `--portable` évite l'installation.
 - Mises à jour : `src/Updater.cs` (2 min après le lancement puis toutes les 6 h, seulement la copie installée en admin) télécharge `RgbManager.exe` de la dernière release dans le dossier d'installation (réservé aux admins, jamais `%TEMP%` : l'exe sera lancé en admin), vérifie taille + SHA-256, le lance avec `--updated` (installation sans fenêtre) et se ferme.
 - Publier une version : `AssemblyVersion` dans `src/Compat.cs`, commit, étiquette `vX.Y.Z` poussée → `.github/workflows/build.yml` compile, vérifie que l'étiquette = la version de l'exe, crée la release avec `RgbManager.exe`.
 - `pwsh -File deploy.ps1` : lance `out\RgbManager.exe --updated` (une fenêtre UAC, puis installation silencieuse).
 - Pas de TargetFramework dans l'exe → .NET 4.8 n'active pas TLS 1.2 tout seul : `GitHub.cs` le force. JSON : `JavaScriptSerializer` (System.Web.Extensions). Ne pas utiliser `dynamic` (pas de Microsoft.CSharp référencé).
-- Le PowerShell par défaut de cette machine est **32 bits** : passer par `C:\Program Files\PowerShell\7\pwsh.exe` pour tout ce qui touche au 64 bits (registre, `System32`, modules de processus).
+- Le PowerShell par défaut du PC ASUS est **32 bits** : passer par `C:\Program Files\PowerShell\7\pwsh.exe` pour tout ce qui touche au 64 bits (registre, `System32`, modules de processus).
 
 ## Tester
 
 - `out\RgbManager.exe` lancé sans option **s'installe** : pour un essai, passer une option (`--test N`, `--portable --no-elevate`…).
 - Arrêter l'appli installée : `schtasks /End /TN RgbManager` ; la relancer : `schtasks /Run /TN RgbManager`.
 - Journal : `C:\ProgramData\RgbManager\log.txt` (une exécution non admin écrit dans `%TEMP%\RgbManager-log.txt`).
-- HID (carte mère, Commander CORE) : testable sans admin avec `--no-elevate`. RAM : admin obligatoire (PawnIO).
+- HID (cartes mères, Commander CORE, clavier) : testable sans admin avec `--no-elevate`. RAM : admin obligatoire (PawnIO).
+- Pour essayer une couleur sans toucher à l'appli installée : écrire `C:\ProgramData\RgbManager\settings.ini`, lancer `--test N --portable`, puis remettre l'ancien fichier (`--test` lit les réglages mais ne les enregistre pas).
 - Options de diagnostic : `--test N`, `--aura-probe`, `--aura-probe2`, `--argb-count` (voir `Program.cs`).
 - Le rendu se vérifie **à l'œil** : demander à l'utilisateur ce qu'il voit.
 
 ## Règles de sécurité (ne pas assouplir)
 
-- SMBus : n'écrire qu'aux adresses `0x58`–`0x5F` (`CorsairDram.Guard`). Jamais `0x50`–`0x57` (SPD).
+- SMBus : n'écrire qu'aux adresses des contrôleurs RGB : `0x58`–`0x5F` pour Corsair (`CorsairDram.Guard`), `0x27`, `0x20`–`0x23` et `0x39`–`0x3C` pour Crucial (`CrucialDram.Guard`). Jamais `0x50`–`0x57` (SPD). Les adresses Crucial ne sont sondées que si WMI annonce de la RAM Ballistix (`CrucialDram.Installed`), et alors la détection Corsair n'est pas lancée : une seule famille de RAM sondée par PC.
 - Commander CORE : ne jamais écrire de vitesse de pompe/ventilateur ; garder la surveillance de la pompe (< 400 tr/min → mode matériel) et le retour au mode matériel en quittant.
 - Mutex SMBus global `Global\Access_SMBUS.HTP.Method` autour de chaque accès (partagé avec HWiNFO, LibreHardwareMonitor…).
 

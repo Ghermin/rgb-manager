@@ -3,9 +3,12 @@ using System.Diagnostics;
 namespace RgbManager;
 
 /// <summary>
-/// Pilote tous les appareils depuis un seul fil d'exécution dédié, en « mode direct » :
-/// l'appli calcule elle-même la couleur de chaque LED et la renvoie régulièrement
-/// (toutes les 3 s en statique, en continu pour les animations).
+/// Pilote tous les appareils depuis un seul fil d'exécution dédié. Le même exe sert sur plusieurs PC :
+/// il détecte ce qui est branché (carte ASUS ou MSI, RAM Corsair ou Crucial, watercooling, clavier).
+/// - Appareils en « mode direct » (AURA, RAM Corsair, Commander CORE) : l'appli calcule la couleur de chaque LED
+///   et la renvoie régulièrement (toutes les 3 s en statique, en continu pour les animations).
+/// - Appareils à couleur fixe (MSI, RAM Crucial, clavier Logitech) : une seule écriture à chaque changement ;
+///   les effets animés y donnent la couleur choisie, fixe.
 /// Commander CORE : surveillance de la pompe en plus.
 /// </summary>
 sealed class Engine
@@ -14,6 +17,7 @@ sealed class Engine
     const int StaticRefreshMs = 3000;   // renvoi des couleurs fixes (le Commander CORE exige < 10 s)
     const int AnimationMs = 50;         // ~20 images/s pour la carte mère et le watercooling
     const int RamAnimationMs = 100;     // ~10 images/s pour la RAM (bus SMBus plus lent)
+    const int FixedRetryMs = 30_000;    // nouvel essai si un appareil à couleur fixe a refusé
 
     readonly Settings _settings;
     readonly object _gate = new();
@@ -29,11 +33,17 @@ sealed class Engine
     List<CorsairDram> _rams = new();
     CommanderCore _cc;
     bool _ccDisabledBySafety;
+    MsiMysticLight _msi;
+    List<CrucialDram> _crucials = new();
+    bool? _ballistix;
+    LogitechHidpp _keyboard;
     int _errors;
 
-    public string AuraStatus { get; private set; } = "Carte mère : détection…";
+    public string BoardStatus { get; private set; } = "Carte mère : détection…";
     public string RamStatus { get; private set; } = "RAM : détection…";
     public string CommanderStatus { get; private set; } = "Watercooling : détection…";
+    public string KeyboardStatus { get; private set; } = "Clavier : détection…";
+    public bool HasKeyboard => _keyboard != null;
 
     public event Action StatusChanged;
     public event Action<string> Warning;
@@ -86,8 +96,9 @@ sealed class Engine
         Detect();
         var clock = Stopwatch.StartNew();
         const long Never = long.MinValue / 2;
-        long lastAura = Never, lastRam = Never, lastCc = Never, lastPumpCheck = 0, lastPumpLog = Never, lastDetect = 0;
+        long lastAura = Never, lastRam = Never, lastCc = Never, lastPumpCheck = 0, lastPumpLog = Never, lastDetect = 0, lastFixed = Never;
         int lowPumpReadings = 0;
+        bool fixedPending = false;
 
         while (_running)
         {
@@ -111,8 +122,16 @@ sealed class Engine
 
             if (apply)
             {
-                lastAura = lastRam = lastCc = Never;
-                Log.W($"Réglages : {s.Effect}, couleur {s.R},{s.G},{s.B}, luminosité {s.Brightness} %, vitesse {s.Speed}");
+                lastAura = lastRam = lastCc = lastFixed = Never;
+                fixedPending = true;
+                Log.W($"Réglages : {s.Effect}, couleur {s.R},{s.G},{s.B}, luminosité {s.Brightness} % (clavier {s.KeyboardBrightness} %), vitesse {s.Speed}");
+            }
+
+            // --- Appareils à couleur fixe (MSI, RAM Crucial, clavier) : une écriture par changement ---
+            if (fixedPending && Due(now, lastFixed, FixedRetryMs))
+            {
+                lastFixed = now;
+                fixedPending = !ApplyFixed(s);
             }
 
             bool animated = s.Effect is Effect.Breathing or Effect.Rainbow;
@@ -240,29 +259,87 @@ sealed class Engine
         StatusChanged?.Invoke();
     }
 
-    bool Missing => _aura == null || (_admin && _rams.Count == 0) || _cc == null;
+    /// <summary>Couleur fixe sur la carte MSI, la RAM Crucial et le clavier. Renvoie false si l'un a refusé (nouvel essai plus tard).</summary>
+    bool ApplyFixed(Settings s)
+    {
+        bool off = s.Effect == Effect.Off;
+        var pc = off ? ((byte)0, (byte)0, (byte)0) : s.ScaledColor();
+        var kb = off ? ((byte)0, (byte)0, (byte)0) : s.ScaledColor(keyboard: true);
+        bool ok = true;
+
+        if (_msi != null && s.Mainboard)
+        {
+            try
+            {
+                if (_msi.SetStatic(pc.Item1, pc.Item2, pc.Item3)) Log.W($"{_msi.Name} : couleur {pc.Item1},{pc.Item2},{pc.Item3}");
+                else { ok = false; Log.W($"{_msi.Name} : la carte n'a pas confirmé la couleur"); }
+            }
+            catch (Exception ex) { ok = false; LogError(_msi.Name, ex); }
+        }
+
+        if (_crucials.Count > 0 && s.Ram)
+        {
+            bool ramOk = true;
+            foreach (var ram in _crucials)
+            {
+                try { ram.SetStatic(_bus, pc.Item1, pc.Item2, pc.Item3); }
+                catch (Exception ex) { ramOk = false; LogError($"RAM 0x{ram.Address:X2}", ex); }
+            }
+            if (ramOk) Log.W($"RAM Crucial : couleur {pc.Item1},{pc.Item2},{pc.Item3} sur {_crucials.Count} barrettes");
+            ok &= ramOk;
+        }
+
+        if (_keyboard != null && s.Keyboard)
+        {
+            try
+            {
+                int zones = _keyboard.SetStatic(kb.Item1, kb.Item2, kb.Item3);
+                if (zones > 0) Log.W($"{_keyboard.Name} : couleur {kb.Item1},{kb.Item2},{kb.Item3} sur {zones} zones");
+                else { ok = false; Log.W($"{_keyboard.Name} : aucune zone n'accepte la couleur fixe"); }
+            }
+            catch (Exception ex) { ok = false; LogError(_keyboard.Name, ex); }
+        }
+        return ok;
+    }
+
+    bool Missing => (_aura == null && _msi == null) || (_admin && _rams.Count == 0 && _crucials.Count == 0) || _cc == null || _keyboard == null;
 
     /// <summary>Détecte les appareils pas encore trouvés. Renvoie true si un nouvel appareil a été trouvé.</summary>
     bool Detect()
     {
         bool found = false;
 
-        if (_aura == null)
+        if (_aura == null && _msi == null)
         {
             try
             {
                 _aura = AuraMainboard.Open();
                 _auraDirect = false;
                 found = true;
-                AuraStatus = $"Carte mère ASUS ({_aura.Channels.Count} zones)";
+                BoardStatus = $"Carte mère ASUS ({_aura.Channels.Count} zones)";
                 Log.W($"AURA : firmware {_aura.Firmware}, table {Log.Hex(_aura.ConfigTable, 0, 60)}");
                 foreach (var ch in _aura.Channels)
                     Log.W($"AURA : zone effet {ch.EffectChannel}, direct 0x{ch.DirectChannel:X2}, {ch.DirectLeds} LED, {(ch.Addressable ? "prise ARGB" : "carte mère")}");
             }
             catch (Exception ex)
             {
-                AuraStatus = "Carte mère : non détectée";
+                BoardStatus = "Carte mère : non détectée";
                 Log.W($"AURA : {ex.GetType().Name} : {ex.Message}");
+            }
+
+            if (_aura == null)
+            {
+                try
+                {
+                    _msi = MsiMysticLight.Open();
+                    found = true;
+                    BoardStatus = $"Carte mère {_msi.Name}";
+                    Log.W($"{_msi.Name} : contrôleur Mystic Light trouvé");
+                }
+                catch (Exception ex)
+                {
+                    Log.W($"MSI : {ex.GetType().Name} : {ex.Message}");
+                }
             }
         }
 
@@ -270,7 +347,7 @@ sealed class Engine
         {
             RamStatus = "RAM : droits admin nécessaires";
         }
-        else if (_rams.Count == 0)
+        else if (_rams.Count == 0 && _crucials.Count == 0)
         {
             try
             {
@@ -280,9 +357,20 @@ sealed class Engine
                     var id = _bus.Identity();
                     Log.W($"SMBus : {id.Name} ({id.Vendor:X4}:{id.Device:X4})");
                 }
-                _rams = CorsairDram.Detect(_bus);
-                if (_rams.Count > 0) found = true;
-                RamStatus = _rams.Count > 0 ? $"RAM Corsair ({_rams.Count} barrettes)" : "RAM : aucune barrette Corsair trouvée";
+                // Une seule famille de RAM sondée : les adresses Crucial ne sont lues que si Windows annonce de la Ballistix.
+                _ballistix ??= CrucialDram.Installed();
+                if (_ballistix == true)
+                {
+                    _crucials = CrucialDram.Detect(_bus);
+                    if (_crucials.Count > 0) found = true;
+                    RamStatus = _crucials.Count > 0 ? $"RAM Crucial Ballistix ({_crucials.Count} barrettes)" : "RAM : aucune barrette Crucial trouvée";
+                }
+                else
+                {
+                    _rams = CorsairDram.Detect(_bus);
+                    if (_rams.Count > 0) found = true;
+                    RamStatus = _rams.Count > 0 ? $"RAM Corsair ({_rams.Count} barrettes)" : "RAM : aucune barrette Corsair trouvée";
+                }
             }
             catch (Exception ex)
             {
@@ -303,6 +391,21 @@ sealed class Engine
             {
                 CommanderStatus = "Watercooling : non détecté";
                 Log.W($"Commander CORE : {ex.GetType().Name} : {ex.Message}");
+            }
+        }
+
+        if (_keyboard == null)
+        {
+            try
+            {
+                _keyboard = LogitechHidpp.Open();
+                found = true;
+                KeyboardStatus = $"Clavier {_keyboard.Name}";
+            }
+            catch (Exception ex)
+            {
+                KeyboardStatus = "Clavier : non détecté";
+                Log.W($"Clavier : {ex.GetType().Name} : {ex.Message}");
             }
         }
 
@@ -388,6 +491,8 @@ sealed class Engine
         }
         _cc?.Dispose();
         _aura?.Dispose();
+        _msi?.Dispose();
+        _keyboard?.Dispose();
         _bus?.Dispose();
     }
 }
