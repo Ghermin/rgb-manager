@@ -57,7 +57,6 @@ Pas besoin de Visual Studio ni du .NET SDK : `build.ps1` utilise le compilateur 
 ```powershell
 pwsh -File build.ps1        # → out\RgbManager.exe (module PawnIO embarqué)
 pwsh -File deploy.ps1       # installe out\RgbManager.exe sans message et relance l'appli
-pwsh -File assets\make-icon.ps1   # régénère l'icône
 ```
 
 Publier une version : changer `AssemblyVersion` dans `src/Compat.cs`, commiter, puis pousser l'étiquette

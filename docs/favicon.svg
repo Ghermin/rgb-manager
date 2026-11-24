@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="rgb-manager-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#c2187a"/>
+      <stop offset="1" stop-color="#3b5bf0"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#rgb-manager-bg)"/>
+  <g id="glyph" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Trois faisceaux de lumière qui se mélangent : rouge, vert… -->
+    <path d="M21 25.5a11 11 0 1 0 22 0a11 11 0 1 0 -22 0z"/>
+    <path d="M13.5 38.5a11 11 0 1 0 22 0a11 11 0 1 0 -22 0z"/>
+    <!-- … et bleu -->
+    <path d="M28.5 38.5a11 11 0 1 0 22 0a11 11 0 1 0 -22 0z" stroke-opacity=".55"/>
+  </g>
+</svg>

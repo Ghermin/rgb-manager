@@ -52,7 +52,7 @@ Avant de modifier la page ou le style, se demander si le changement est local ou
 - Si le nom, la description, les tags, l'icône ou l'adresse du projet changent, mettre à jour sa carte dans `index.html` du playground.
 - Le menu reproduit sur la page reprend les entrées de `TrayApp.BuildMenu()` : le mettre à jour si le menu change.
 - Le vrai menu a le même design que la page (`src/MenuTheme.cs` : couleurs `Palette.Light` / `Palette.Dark` = variables `--pg-*` de `docs/index.html`, coins arrondis DWM sous Windows 11). Il suit le mode clair / sombre de Windows, relu à chaque ouverture du menu. Changer les couleurs aux deux endroits.
-- Icône : celle de l'appli (`assets/make-icon.ps1`), copiée dans `docs/icon.png` et `docs/favicon.ico`, et dans `assets/projects/rgb-manager.png` du playground. Pas (encore) de SVG dans `brand/icons/` : ne pas ajouter `rgb-manager` à `TARGETS` de `brand/build.js` sans revoir l'icône, il écraserait `assets/icon.ico`.
+- Icône : `brand/icons/rgb-manager.svg` du playground (même grille que les autres projets). Après une modification, `node build.js rgb-manager` dans `brand/` du playground régénère `assets/icon.ico` (icône de l'exe), `assets/icon-256.png` (README), `docs/favicon.svg`, `docs/favicon.ico`, `docs/apple-touch-icon.png` et `docs/icon.png`, puis commiter dans les deux repos. L'icône de la zone de notification est dessinée à part (`TrayApp`, disque de la couleur en cours).
 - L'appli porte le lien discret « un projet du bored dev playground » en bas de son menu (`TrayApp.Playground`).
 
 À garder sur la page : le bandeau `pg-strip` qui ramène au playground, le thème clair / sombre automatique, le responsive (pas de défilement horizontal sur mobile), 2 polices max (Sora + JetBrains Mono).
