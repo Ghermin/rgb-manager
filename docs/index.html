@@ -65,6 +65,11 @@
   .menu li.on { background: var(--pg-surface-2); }
   .menu li.on::after { content: "✓"; margin-left: auto; color: var(--pg-muted); font-size: 13px; }
   .menu .sw { width: 14px; height: 14px; border-radius: 4px; flex: none; border: 1px solid rgba(127, 127, 127, .35); }
+  .menu li.slider { gap: 12px; }
+  .menu .track { flex: 1; min-width: 60px; height: 4px; border-radius: 2px; background: var(--pg-line); position: relative; }
+  .menu .track span { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: var(--pg-text); }
+  .menu .track span::after { content: ""; position: absolute; right: -7px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--pg-surface); border: 2px solid var(--pg-text); }
+  .menu .val { color: var(--pg-muted); font-size: 13px; min-width: 38px; text-align: right; }
   .menu .sigline { font: 500 11px/1.5 var(--pg-mono); color: var(--pg-muted); opacity: .8; }
   .swatches { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 12px 8px !important; }
   .swatches .sw { width: 18px; height: 18px; border-radius: 5px; }
@@ -156,9 +161,8 @@
           <li>Couleur personnalisée…</li>
           <li class="sep"></li>
           <li class="sub">Effet</li>
-          <li class="sub">Luminosité</li>
           <li class="sub">Vitesse des effets</li>
-          <li class="sub">Luminosité du clavier</li>
+          <li class="slider">Luminosité <span class="track"><span style="width:75%"></span></span><span class="val">75 %</span></li>
           <li class="sub">Appareils</li>
           <li class="sep"></li>
           <li class="on">Lancer au démarrage de Windows</li>
@@ -178,7 +182,7 @@
     <p class="pg-section__lead">L'appli calcule chaque image elle-même et l'envoie à chaque appareil en « mode direct » : tout est synchronisé, sans dépendre des effets intégrés au matériel. Ceux qui ne le permettent pas (carte MSI, RAM Crucial, clavier) prennent la couleur choisie, fixe.</p>
     <div class="pg-grid features">
       <div class="pg-card"><h3><span class="dot"></span>Couleurs et effets</h3><p>Neuf couleurs prêtes ou une couleur au choix. Effets statique, respiration, arc-en-ciel ou éteint, avec luminosité et vitesse réglables.</p></div>
-      <div class="pg-card"><h3><span class="dot"></span>Tout ensemble</h3><p>Carte mère, RAM, watercooling, clavier et ruban du boîtier changent en même temps. Chaque appareil peut être coupé séparément, le clavier a sa propre luminosité.</p></div>
+      <div class="pg-card"><h3><span class="dot"></span>Tout ensemble</h3><p>Carte mère, RAM, watercooling, clavier et ruban du boîtier changent en même temps. Une luminosité globale et un curseur par appareil ; chacun peut aussi être coupé séparément.</p></div>
       <div class="pg-card"><h3><span class="dot"></span>Surveille la pompe</h3><p>Si la pompe du watercooling passe sous 400 tr/min, l'appli rend aussitôt la main au boîtier Corsair. Les vitesses ne sont jamais modifiées.</p></div>
       <div class="pg-card"><h3><span class="dot"></span>Léger et discret</h3><p>Un seul exécutable, lancé avec Windows par une tâche planifiée, sans fenêtre UAC. Il reprend tout seul après la veille et se met à jour tout seul.</p></div>
     </div>
@@ -197,7 +201,7 @@
           <tr><th scope="row">RAM</th><td>Corsair DDR4 RGB (Dominator Platinum, Vengeance RGB Pro/SL/RS) sur chipset AMD</td><td>SMBus via <a href="https://pawnio.eu">PawnIO</a>, le remplaçant signé de WinRing0</td></tr>
           <tr><th scope="row">RAM</th><td>Crucial Ballistix RGB DDR4 sur chipset AMD</td><td>SMBus via PawnIO, couleur fixe</td></tr>
           <tr><th scope="row">Watercooling</th><td>Corsair iCUE Commander CORE <code>1B1C:0C1C</code></td><td>HID, vitesses de la pompe et des ventilateurs jamais modifiées</td></tr>
-          <tr><th scope="row">Clavier</th><td>Logitech G513 <code>046D:C33C</code></td><td>HID++, couleur fixe, luminosité à part</td></tr>
+          <tr><th scope="row">Clavier</th><td>Logitech G513 <code>046D:C33C</code></td><td>HID++, couleur fixe</td></tr>
           <tr><th scope="row">Boîtier</th><td>Ruban ARGB branché sur la carte mère (ex. be quiet! Pure Base 500DX)</td><td>Via la prise ARGB de la carte mère</td></tr>
         </tbody>
       </table>

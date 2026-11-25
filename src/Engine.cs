@@ -18,6 +18,7 @@ sealed class Engine
     const int AnimationMs = 50;         // ~20 images/s pour la carte mère et le watercooling
     const int RamAnimationMs = 100;     // ~10 images/s pour la RAM (bus SMBus plus lent)
     const int FixedRetryMs = 30_000;    // nouvel essai si un appareil à couleur fixe a refusé
+    const int FixedMinGapMs = 200;      // écart minimal entre deux écritures (curseur qu'on fait glisser)
 
     readonly Settings _settings;
     readonly object _gate = new();
@@ -26,6 +27,7 @@ sealed class Engine
     Thread _thread;
     volatile bool _running;
     bool _applyPending = true;
+    bool _logPending = true;
 
     AuraMainboard _aura;
     bool _auraDirect;
@@ -43,6 +45,9 @@ sealed class Engine
     public string RamStatus { get; private set; } = "RAM : détection…";
     public string CommanderStatus { get; private set; } = "Watercooling : détection…";
     public string KeyboardStatus { get; private set; } = "Clavier : détection…";
+    public bool HasBoard => _aura != null || _msi != null;
+    public bool HasRam => _rams.Count > 0 || _crucials.Count > 0;
+    public bool HasCommander => _cc != null; // reste affiché s'il est coupé par sécurité (statut)
     public bool HasKeyboard => _keyboard != null;
 
     public event Action StatusChanged;
@@ -61,15 +66,19 @@ sealed class Engine
         _thread.Start();
     }
 
-    /// <summary>Modifie les réglages (depuis l'interface), les enregistre et les applique.</summary>
-    public void Update(Action<Settings> change)
+    /// <summary>
+    /// Modifie les réglages (depuis l'interface) et les applique. <paramref name="save"/> = false pendant qu'on fait
+    /// glisser un curseur : rendu en direct, sans écrire le fichier ni le journal à chaque pas.
+    /// </summary>
+    public void Update(Action<Settings> change, bool save = true)
     {
         lock (_gate)
         {
             change(_settings);
             _applyPending = true;
+            if (save) _logPending = true;
         }
-        _settings.Save();
+        if (save) _settings.Save();
     }
 
     /// <summary>Force un renvoi immédiat des couleurs (ex. sortie de veille).</summary>
@@ -78,6 +87,7 @@ sealed class Engine
         lock (_gate)
         {
             _applyPending = true;
+            _logPending = true;
             if (commit) _auraDirect = false;
         }
     }
@@ -96,19 +106,20 @@ sealed class Engine
         Detect();
         var clock = Stopwatch.StartNew();
         const long Never = long.MinValue / 2;
-        long lastAura = Never, lastRam = Never, lastCc = Never, lastPumpCheck = 0, lastPumpLog = Never, lastDetect = 0, lastFixed = Never;
+        long lastAura = Never, lastRam = Never, lastCc = Never, lastPumpCheck = 0, lastPumpLog = Never, lastDetect = 0, lastFixed = Never, lastFixedWrite = Never;
         int lowPumpReadings = 0;
-        bool fixedPending = false;
+        bool fixedPending = false, logFixed = false;
 
         while (_running)
         {
             Settings s;
-            bool apply;
+            bool apply, log;
             lock (_gate)
             {
                 s = _settings.Clone();
                 apply = _applyPending;
-                _applyPending = false;
+                log = _logPending;
+                _applyPending = _logPending = false;
             }
 
             long now = clock.ElapsedMilliseconds;
@@ -124,14 +135,18 @@ sealed class Engine
             {
                 lastAura = lastRam = lastCc = lastFixed = Never;
                 fixedPending = true;
-                Log.W($"Réglages : {s.Effect}, couleur {s.R},{s.G},{s.B}, luminosité {s.Brightness} % (clavier {s.KeyboardBrightness} %), vitesse {s.Speed}");
+                logFixed |= log;
+                if (log)
+                    Log.W($"Réglages : {s.Effect}, couleur {s.R},{s.G},{s.B}, luminosité {s.Brightness} % (carte mère {s.MainboardBrightness} %, " +
+                          $"RAM {s.RamBrightness} %, watercooling {s.CommanderBrightness} %, clavier {s.KeyboardBrightness} %), vitesse {s.Speed}");
             }
 
             // --- Appareils à couleur fixe (MSI, RAM Crucial, clavier) : une écriture par changement ---
-            if (fixedPending && Due(now, lastFixed, FixedRetryMs))
+            if (fixedPending && Due(now, lastFixed, FixedRetryMs) && Due(now, lastFixedWrite, FixedMinGapMs))
             {
-                lastFixed = now;
-                fixedPending = !ApplyFixed(s);
+                lastFixed = lastFixedWrite = now;
+                fixedPending = !ApplyFixed(s, logFixed);
+                logFixed = false;
             }
 
             bool animated = s.Effect is Effect.Breathing or Effect.Rainbow;
@@ -149,7 +164,7 @@ sealed class Engine
                         Log.W("AURA : mode direct activé");
                     }
                     foreach (var ch in _aura.Channels)
-                        _aura.SendDirect(ch, Frame(s, now, ch.DirectLeds, ch.DirectLeds));
+                        _aura.SendDirect(ch, Frame(s, s.Level(s.MainboardBrightness), now, ch.DirectLeds, ch.DirectLeds));
                 });
             }
 
@@ -162,7 +177,7 @@ sealed class Engine
                     var r = ram;
                     Guarded($"RAM 0x{r.Address:X2}", () =>
                     {
-                        if (!r.SetDirect(_bus, Frame(s, now, r.LedCount, r.LedCount)))
+                        if (!r.SetDirect(_bus, Frame(s, s.Level(s.RamBrightness), now, r.LedCount, r.LedCount)))
                             throw new IOException("écriture SMBus refusée");
                     });
                 }
@@ -259,19 +274,21 @@ sealed class Engine
         StatusChanged?.Invoke();
     }
 
-    /// <summary>Couleur fixe sur la carte MSI, la RAM Crucial et le clavier. Renvoie false si l'un a refusé (nouvel essai plus tard).</summary>
-    bool ApplyFixed(Settings s)
+    /// <summary>
+    /// Couleur fixe sur la carte MSI, la RAM Crucial et le clavier. Renvoie false si l'un a refusé (nouvel essai plus tard).
+    /// <paramref name="log"/> = false pendant qu'on fait glisser un curseur : seules les erreurs vont au journal.
+    /// </summary>
+    bool ApplyFixed(Settings s, bool log)
     {
-        bool off = s.Effect == Effect.Off;
-        var pc = off ? ((byte)0, (byte)0, (byte)0) : s.ScaledColor();
-        var kb = off ? ((byte)0, (byte)0, (byte)0) : s.ScaledColor(keyboard: true);
+        (byte, byte, byte) Scaled(int deviceBrightness) => s.Effect == Effect.Off ? ((byte)0, (byte)0, (byte)0) : s.ScaledColor(deviceBrightness);
         bool ok = true;
 
         if (_msi != null && s.Mainboard)
         {
+            var pc = Scaled(s.MainboardBrightness);
             try
             {
-                if (_msi.SetStatic(pc.Item1, pc.Item2, pc.Item3)) Log.W($"{_msi.Name} : couleur {pc.Item1},{pc.Item2},{pc.Item3}");
+                if (_msi.SetStatic(pc.Item1, pc.Item2, pc.Item3)) { if (log) Log.W($"{_msi.Name} : couleur {pc.Item1},{pc.Item2},{pc.Item3}"); }
                 else { ok = false; Log.W($"{_msi.Name} : la carte n'a pas confirmé la couleur"); }
             }
             catch (Exception ex) { ok = false; LogError(_msi.Name, ex); }
@@ -279,22 +296,24 @@ sealed class Engine
 
         if (_crucials.Count > 0 && s.Ram)
         {
+            var pc = Scaled(s.RamBrightness);
             bool ramOk = true;
             foreach (var ram in _crucials)
             {
                 try { ram.SetStatic(_bus, pc.Item1, pc.Item2, pc.Item3); }
                 catch (Exception ex) { ramOk = false; LogError($"RAM 0x{ram.Address:X2}", ex); }
             }
-            if (ramOk) Log.W($"RAM Crucial : couleur {pc.Item1},{pc.Item2},{pc.Item3} sur {_crucials.Count} barrettes");
+            if (ramOk && log) Log.W($"RAM Crucial : couleur {pc.Item1},{pc.Item2},{pc.Item3} sur {_crucials.Count} barrettes");
             ok &= ramOk;
         }
 
         if (_keyboard != null && s.Keyboard)
         {
+            var kb = Scaled(s.KeyboardBrightness);
             try
             {
                 int zones = _keyboard.SetStatic(kb.Item1, kb.Item2, kb.Item3);
-                if (zones > 0) Log.W($"{_keyboard.Name} : couleur {kb.Item1},{kb.Item2},{kb.Item3} sur {zones} zones");
+                if (zones > 0) { if (log) Log.W($"{_keyboard.Name} : couleur {kb.Item1},{kb.Item2},{kb.Item3} sur {zones} zones"); }
                 else { ok = false; Log.W($"{_keyboard.Name} : aucune zone n'accepte la couleur fixe"); }
             }
             catch (Exception ex) { ok = false; LogError(_keyboard.Name, ex); }
@@ -417,21 +436,21 @@ sealed class Engine
     byte[] CommanderFrame(Settings s, long ms)
     {
         int pump = _cc.PumpLeds;
+        double bri = s.Level(s.CommanderBrightness);
         var buf = new byte[_cc.TotalLeds * 3];
-        Array.Copy(Frame(s, ms, pump, pump), 0, buf, 0, pump * 3);
-        var fan = Frame(s, ms, CommanderCore.LedsPerFanPort, CommanderCore.LedsPerFanPort);
+        Array.Copy(Frame(s, bri, ms, pump, pump), 0, buf, 0, pump * 3);
+        var fan = Frame(s, bri, ms, CommanderCore.LedsPerFanPort, CommanderCore.LedsPerFanPort);
         for (int port = 0; port < CommanderCore.FanPorts; port++)
             Array.Copy(fan, 0, buf, (pump + port * CommanderCore.LedsPerFanPort) * 3, fan.Length);
         return buf;
     }
 
-    /// <summary>Couleurs de <paramref name="count"/> LED (3 octets chacune) à l'instant <paramref name="ms"/>.</summary>
-    static byte[] Frame(Settings s, long ms, int count, int zoneLength)
+    /// <summary>Couleurs de <paramref name="count"/> LED (3 octets chacune) à l'instant <paramref name="ms"/>, luminosité <paramref name="bri"/> (0 à 1).</summary>
+    static byte[] Frame(Settings s, double bri, long ms, int count, int zoneLength)
     {
         var buf = new byte[count * 3];
         double period = s.Speed switch { 0 => 8000.0, 2 => 2500.0, _ => 5000.0 };
         double t = ms / period;
-        double bri = Compat.Clamp(s.Brightness, 0, 100) / 100.0;
 
         for (int i = 0; i < count; i++)
         {

@@ -266,3 +266,161 @@ sealed class SwatchRow : ToolStripItem
         }
     }
 }
+
+/// <summary>
+/// Curseur 0–100 % dans le menu (luminosité). Hébergé comme contrôle : glisser ou cliquer ne ferme pas le menu.
+/// <see cref="Changed"/> part en continu pendant le glissement (final = false), puis une fois au relâchement (final = true).
+/// </summary>
+sealed class SliderRow : ToolStripControlHost
+{
+    public SliderRow(string label, MenuTheme theme) : base(new SliderControl(label, theme))
+    {
+        Margin = Padding.Empty;
+        Padding = Padding.Empty;
+        AccessibleName = label;
+    }
+
+    SliderControl Slider => (SliderControl)Control;
+
+    public int Value
+    {
+        get => Slider.Value;
+        set => Slider.Value = value;
+    }
+
+    public event Action<int, bool> Changed
+    {
+        add => Slider.Changed += value;
+        remove => Slider.Changed -= value;
+    }
+}
+
+sealed class SliderControl : Control
+{
+    readonly string _label;
+    readonly MenuTheme _theme;
+    int _value = 100;
+    bool _drag, _hover;
+
+    public event Action<int, bool> Changed;
+
+    public SliderControl(string label, MenuTheme theme)
+    {
+        _label = label;
+        _theme = theme;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        SetStyle(ControlStyles.Selectable, false); // le clavier reste au menu
+        TabStop = false;
+        Font = MenuTheme.TextFont;
+        Size = GetPreferredSize(Size.Empty);
+    }
+
+    public int Value
+    {
+        get => _value;
+        set
+        {
+            value = Compat.Clamp(value, 0, 100);
+            if (value == _value) return;
+            _value = value;
+            Invalidate();
+        }
+    }
+
+    float S => DeviceDpi / 96f;
+    float Inset => 4 * S; // aligné sur le texte des autres entrées
+    int LabelWidth => string.IsNullOrEmpty(_label) ? 0 : TextRenderer.MeasureText(_label, Font).Width + (int)(10 * S);
+    int ValueWidth => TextRenderer.MeasureText("100 %", Font).Width + (int)(4 * S);
+    float Knob => 6 * S;
+
+    public override Size GetPreferredSize(Size proposedSize) =>
+        new((int)(Inset + LabelWidth + 130 * S + ValueWidth + 8 * S), (int)(30 * S));
+
+    (float X0, float X1) Track()
+    {
+        float x0 = Inset + LabelWidth + Knob, x1 = Width - ValueWidth - 8 * S - Knob;
+        return (x0, Math.Max(x0 + 1, x1));
+    }
+
+    void SetFromX(int x, bool final)
+    {
+        var (x0, x1) = Track();
+        int v = (int)Math.Round((x - x0) / (x1 - x0) * 100);
+        v = Compat.Clamp(v, 0, 100);
+        bool changed = v != _value;
+        Value = v;
+        if (changed || final) Changed?.Invoke(_value, final);
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left)
+        {
+            _drag = true;
+            Capture = true;
+            SetFromX(e.X, false);
+        }
+        base.OnMouseDown(e);
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        if (_drag) SetFromX(e.X, false);
+        base.OnMouseMove(e);
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        if (_drag && e.Button == MouseButtons.Left)
+        {
+            _drag = false;
+            Capture = false;
+            SetFromX(e.X, true);
+        }
+        base.OnMouseUp(e);
+    }
+
+    protected override void OnMouseWheel(MouseEventArgs e)
+    {
+        int v = Compat.Clamp(_value + Math.Sign(e.Delta) * 5, 0, 100);
+        if (v != _value)
+        {
+            Value = v;
+            Changed?.Invoke(v, true);
+        }
+        base.OnMouseWheel(e);
+    }
+
+    protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { _hover = false; Invalidate(); base.OnMouseLeave(e); }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        var p = _theme.P;
+        g.Clear(p.Back);
+
+        var text = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine;
+        if (LabelWidth > 0)
+            TextRenderer.DrawText(g, _label, Font, new Rectangle((int)Inset, 0, LabelWidth, Height), p.Text, text | TextFormatFlags.Left);
+        TextRenderer.DrawText(g, $"{_value} %", Font, new Rectangle(Width - ValueWidth - (int)(8 * S), 0, ValueWidth, Height), p.Muted, text | TextFormatFlags.Right);
+
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        var (x0, x1) = Track();
+        float cy = Height / 2f, h = 4 * S, x = x0 + (x1 - x0) * _value / 100f;
+        using (var back = MenuTheme.Rounded(new RectangleF(x0, cy - h / 2, x1 - x0, h), h / 2))
+        using (var b = new SolidBrush(p.Line))
+            g.FillPath(b, back);
+        if (x > x0)
+        {
+            using var fill = MenuTheme.Rounded(new RectangleF(x0, cy - h / 2, x - x0, h), h / 2);
+            using var b = new SolidBrush(p.Text);
+            g.FillPath(b, fill);
+        }
+        float r = Knob * (_drag || _hover ? 1.15f : 1f);
+        using (var b = new SolidBrush(p.Back))
+            g.FillEllipse(b, x - r, cy - r, 2 * r, 2 * r);
+        using (var pen = new Pen(p.Text, 2 * S))
+            g.DrawEllipse(pen, x - r, cy - r, 2 * r, 2 * r);
+    }
+}

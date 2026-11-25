@@ -18,7 +18,11 @@ sealed class Settings
     public bool Ram { get; set; } = true;
     public bool Commander { get; set; } = true;
     public bool Keyboard { get; set; } = true;
-    public int KeyboardBrightness { get; set; } = 100; // %, en plus de Brightness : un clavier éclaire de près
+    // Luminosité propre à chaque appareil (%), multipliée par la luminosité globale (Brightness)
+    public int MainboardBrightness { get; set; } = 100;
+    public int RamBrightness { get; set; } = 100;
+    public int CommanderBrightness { get; set; } = 100;
+    public int KeyboardBrightness { get; set; } = 100;
 
     static string FilePath => Path.Combine(Log.Dir, "settings.ini");
 
@@ -47,13 +51,16 @@ sealed class Settings
                     case "G": s.G = byte.Parse(value, CultureInfo.InvariantCulture); break;
                     case "B": s.B = byte.Parse(value, CultureInfo.InvariantCulture); break;
                     case "Effect": if (Enum.TryParse(value, out Effect e)) s.Effect = e; break;
-                    case "Brightness": s.Brightness = Compat.Clamp(int.Parse(value, CultureInfo.InvariantCulture), 0, 100); break;
+                    case "Brightness": s.Brightness = Percent(value); break;
                     case "Speed": s.Speed = Compat.Clamp(int.Parse(value, CultureInfo.InvariantCulture), 0, 2); break;
                     case "Mainboard": s.Mainboard = bool.Parse(value); break;
                     case "Ram": s.Ram = bool.Parse(value); break;
                     case "Commander": s.Commander = bool.Parse(value); break;
                     case "Keyboard": s.Keyboard = bool.Parse(value); break;
-                    case "KeyboardBrightness": s.KeyboardBrightness = Compat.Clamp(int.Parse(value, CultureInfo.InvariantCulture), 0, 100); break;
+                    case "MainboardBrightness": s.MainboardBrightness = Percent(value); break;
+                    case "RamBrightness": s.RamBrightness = Percent(value); break;
+                    case "CommanderBrightness": s.CommanderBrightness = Percent(value); break;
+                    case "KeyboardBrightness": s.KeyboardBrightness = Percent(value); break;
                 }
             }
         }
@@ -74,7 +81,9 @@ sealed class Settings
             sb.AppendLine($"R={R}").AppendLine($"G={G}").AppendLine($"B={B}")
               .AppendLine($"Effect={Effect}").AppendLine($"Brightness={Brightness}").AppendLine($"Speed={Speed}")
               .AppendLine($"Mainboard={Mainboard}").AppendLine($"Ram={Ram}").AppendLine($"Commander={Commander}")
-              .AppendLine($"Keyboard={Keyboard}").AppendLine($"KeyboardBrightness={KeyboardBrightness}");
+              .AppendLine($"Keyboard={Keyboard}")
+              .AppendLine($"MainboardBrightness={MainboardBrightness}").AppendLine($"RamBrightness={RamBrightness}")
+              .AppendLine($"CommanderBrightness={CommanderBrightness}").AppendLine($"KeyboardBrightness={KeyboardBrightness}");
             File.WriteAllText(FilePath, sb.ToString());
         }
         catch (Exception ex)
@@ -82,6 +91,8 @@ sealed class Settings
             Log.W($"Impossible d'enregistrer les réglages ({ex.Message})");
         }
     }
+
+    static int Percent(string value) => Compat.Clamp(int.Parse(value, CultureInfo.InvariantCulture), 0, 100);
 
     public Settings Clone() => (Settings)MemberwiseClone();
 
@@ -114,11 +125,14 @@ sealed class Settings
         }
     }
 
-    /// <summary>Couleur multipliée par la luminosité (et par celle du clavier, pour le clavier).</summary>
-    public (byte R, byte G, byte B) ScaledColor(bool keyboard = false)
+    /// <summary>Luminosité effective d'un appareil (0 à 1) : globale × celle de l'appareil.</summary>
+    public double Level(int deviceBrightness) =>
+        Compat.Clamp(Brightness, 0, 100) / 100.0 * Compat.Clamp(deviceBrightness, 0, 100) / 100.0;
+
+    /// <summary>Couleur multipliée par la luminosité effective d'un appareil.</summary>
+    public (byte R, byte G, byte B) ScaledColor(int deviceBrightness)
     {
-        double k = Compat.Clamp(Brightness, 0, 100) / 100.0;
-        if (keyboard) k *= Compat.Clamp(KeyboardBrightness, 0, 100) / 100.0;
+        double k = Level(deviceBrightness);
         return ((byte)(R * k), (byte)(G * k), (byte)(B * k));
     }
 }

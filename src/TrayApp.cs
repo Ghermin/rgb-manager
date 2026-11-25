@@ -27,7 +27,8 @@ sealed class TrayApp : ApplicationContext
     readonly ToolStripMenuItem _statusRam = new() { Enabled = false };
     readonly ToolStripMenuItem _statusCc = new() { Enabled = false };
     readonly ToolStripMenuItem _statusKeyboard = new() { Enabled = false };
-    ToolStripMenuItem _keyboardBrightness;
+    readonly List<(SliderRow Row, Func<Settings, int> Get, Func<bool> Detected)> _sliders = new();
+    ToolStripMenuItem _devices;
     IntPtr _iconHandle;
     readonly System.Windows.Forms.Timer _updateTimer = new() { Interval = 2 * 60 * 1000 };
     bool _checkingUpdate;
@@ -135,20 +136,21 @@ sealed class TrayApp : ApplicationContext
 
         _menu.Items.Add(Submenu("Effet",
             ("Statique", Effect.Static), ("Respiration", Effect.Breathing), ("Arc-en-ciel", Effect.Rainbow), ("Éteint", Effect.Off)));
-        _menu.Items.Add(Choice("Luminosité", new[] { ("25 %", 25), ("50 %", 50), ("75 %", 75), ("100 %", 100) },
-            () => _settings.Brightness, v => Change(s => s.Brightness = v)));
         _menu.Items.Add(Choice("Vitesse des effets", new[] { ("Lente", 0), ("Moyenne", 1), ("Rapide", 2) },
             () => _settings.Speed, v => Change(s => s.Speed = v)));
-        // Un clavier éclaire de près : sa luminosité se règle à part (affiché seulement si un clavier est détecté)
-        _keyboardBrightness = Choice("Luminosité du clavier", new[] { ("Éteint", 0), ("25 %", 25), ("50 %", 50), ("75 %", 75), ("100 %", 100) },
-            () => _settings.KeyboardBrightness, v => Change(s => s.KeyboardBrightness = v));
-        _menu.Items.Add(_keyboardBrightness);
+        // Luminosité globale, multipliée par celle de chaque appareil (sous-menu Appareils)
+        _menu.Items.Add(Slider("Luminosité", s => s.Brightness, (s, v) => s.Brightness = v));
 
-        var devices = new ToolStripMenuItem("Appareils");
+        // Chaque appareil détecté : case à cocher (statut) puis son curseur de luminosité. Les autres sont masqués.
+        var devices = _devices = new ToolStripMenuItem("Appareils");
         devices.DropDownItems.Add(Toggle(_statusBoard, () => _settings.Mainboard, v => Change(s => s.Mainboard = v)));
+        devices.DropDownItems.Add(Slider(null, s => s.MainboardBrightness, (s, v) => s.MainboardBrightness = v, () => _engine.HasBoard));
         devices.DropDownItems.Add(Toggle(_statusRam, () => _settings.Ram, v => Change(s => s.Ram = v)));
+        devices.DropDownItems.Add(Slider(null, s => s.RamBrightness, (s, v) => s.RamBrightness = v, () => _engine.HasRam));
         devices.DropDownItems.Add(Toggle(_statusCc, () => _settings.Commander, v => Change(s => s.Commander = v)));
+        devices.DropDownItems.Add(Slider(null, s => s.CommanderBrightness, (s, v) => s.CommanderBrightness = v, () => _engine.HasCommander));
         devices.DropDownItems.Add(Toggle(_statusKeyboard, () => _settings.Keyboard, v => Change(s => s.Keyboard = v)));
+        devices.DropDownItems.Add(Slider(null, s => s.KeyboardBrightness, (s, v) => s.KeyboardBrightness = v, () => _engine.HasKeyboard));
         _menu.Items.Add(devices);
         _menu.Items.Add(new ToolStripSeparator());
 
@@ -203,6 +205,19 @@ sealed class TrayApp : ApplicationContext
             foreach (ToolStripMenuItem i in parent.DropDownItems) i.Checked = (int)i.Tag == current();
         };
         return parent;
+    }
+
+    /// <summary>Curseur de luminosité : rendu en direct pendant le glissement, enregistré au relâchement.</summary>
+    SliderRow Slider(string label, Func<Settings, int> get, Action<Settings, int> set, Func<bool> detected = null)
+    {
+        var row = new SliderRow(label, _theme);
+        row.Changed += (v, final) =>
+        {
+            _engine.Update(s => set(s, v), save: final);
+            if (final) RefreshMenu();
+        };
+        _sliders.Add((row, get, detected));
+        return row;
     }
 
     static ToolStripMenuItem Toggle(ToolStripMenuItem item, Func<bool> current, Action<bool> set)
@@ -267,7 +282,16 @@ sealed class TrayApp : ApplicationContext
         _statusRam.Checked = _settings.Ram;
         _statusCc.Checked = _settings.Commander;
         _statusKeyboard.Checked = _settings.Keyboard;
-        _keyboardBrightness.Visible = _engine.HasKeyboard;
+        _statusBoard.Visible = _engine.HasBoard;
+        _statusRam.Visible = _engine.HasRam;
+        _statusCc.Visible = _engine.HasCommander;
+        _statusKeyboard.Visible = _engine.HasKeyboard;
+        _devices.Visible = _engine.HasBoard || _engine.HasRam || _engine.HasCommander || _engine.HasKeyboard;
+        foreach (var (row, get, detected) in _sliders)
+        {
+            row.Value = get(_settings);
+            if (detected != null) row.Visible = detected();
+        }
 
         foreach (ToolStripItem i in _menu.Items)
             if (i is ToolStripMenuItem st && "startup".Equals(st.Tag))

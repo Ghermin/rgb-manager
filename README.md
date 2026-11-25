@@ -13,7 +13,7 @@ Petit gestionnaire d'éclairage RGB pour Windows, **sans Armoury Crate, iCUE, MS
 ## Fonctionnalités
 
 - Couleurs prédéfinies ou personnalisées, effets **statique**, **respiration**, **arc-en-ciel**, **éteint**
-- Luminosité et vitesse réglables, chaque appareil activable séparément, luminosité à part pour le clavier
+- Curseur de luminosité globale, plus un curseur par appareil (menu Appareils) ; vitesse réglable, chaque appareil activable séparément
 - Tous les appareils animés ensemble (l'appli calcule chaque image en « mode direct ») ; ceux qui ne le permettent pas (carte MSI, RAM Crucial, clavier) prennent la couleur choisie, fixe
 - **Surveillance de la pompe** du watercooling : si elle passe sous 400 tr/min, l'appli rend la main au boîtier Corsair
 - Reprise automatique après la veille, nouvelle tentative de détection si un appareil n'est pas prêt au démarrage
