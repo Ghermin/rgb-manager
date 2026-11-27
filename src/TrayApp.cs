@@ -27,7 +27,7 @@ sealed class TrayApp : ApplicationContext
     readonly ToolStripMenuItem _statusRam = new() { Enabled = false };
     readonly ToolStripMenuItem _statusCc = new() { Enabled = false };
     readonly ToolStripMenuItem _statusKeyboard = new() { Enabled = false };
-    readonly List<(SliderRow Row, Func<Settings, int> Get, Func<bool> Detected)> _sliders = new();
+    readonly List<(SliderRow Row, Func<Settings, int> Get, Func<bool> Detected, Func<Settings, bool> On)> _sliders = new();
     ToolStripMenuItem _devices;
     IntPtr _iconHandle;
     readonly System.Windows.Forms.Timer _updateTimer = new() { Interval = 2 * 60 * 1000 };
@@ -144,13 +144,13 @@ sealed class TrayApp : ApplicationContext
         // Chaque appareil détecté : case à cocher (statut) puis son curseur de luminosité. Les autres sont masqués.
         var devices = _devices = new ToolStripMenuItem("Appareils");
         devices.DropDownItems.Add(Toggle(_statusBoard, () => _settings.Mainboard, v => Change(s => s.Mainboard = v)));
-        devices.DropDownItems.Add(Slider(null, s => s.MainboardBrightness, (s, v) => s.MainboardBrightness = v, () => _engine.HasBoard));
+        devices.DropDownItems.Add(Slider(null, s => s.MainboardBrightness, (s, v) => s.MainboardBrightness = v, () => _engine.HasBoard, s => s.Mainboard, s => s.Mainboard = true));
         devices.DropDownItems.Add(Toggle(_statusRam, () => _settings.Ram, v => Change(s => s.Ram = v)));
-        devices.DropDownItems.Add(Slider(null, s => s.RamBrightness, (s, v) => s.RamBrightness = v, () => _engine.HasRam));
+        devices.DropDownItems.Add(Slider(null, s => s.RamBrightness, (s, v) => s.RamBrightness = v, () => _engine.HasRam, s => s.Ram, s => s.Ram = true));
         devices.DropDownItems.Add(Toggle(_statusCc, () => _settings.Commander, v => Change(s => s.Commander = v)));
-        devices.DropDownItems.Add(Slider(null, s => s.CommanderBrightness, (s, v) => s.CommanderBrightness = v, () => _engine.HasCommander));
+        devices.DropDownItems.Add(Slider(null, s => s.CommanderBrightness, (s, v) => s.CommanderBrightness = v, () => _engine.HasCommander, s => s.Commander, s => s.Commander = true));
         devices.DropDownItems.Add(Toggle(_statusKeyboard, () => _settings.Keyboard, v => Change(s => s.Keyboard = v)));
-        devices.DropDownItems.Add(Slider(null, s => s.KeyboardBrightness, (s, v) => s.KeyboardBrightness = v, () => _engine.HasKeyboard));
+        devices.DropDownItems.Add(Slider(null, s => s.KeyboardBrightness, (s, v) => s.KeyboardBrightness = v, () => _engine.HasKeyboard, s => s.Keyboard, s => s.Keyboard = true));
         _menu.Items.Add(devices);
         _menu.Items.Add(new ToolStripSeparator());
 
@@ -207,16 +207,21 @@ sealed class TrayApp : ApplicationContext
         return parent;
     }
 
-    /// <summary>Curseur de luminosité : rendu en direct pendant le glissement, enregistré au relâchement.</summary>
-    SliderRow Slider(string label, Func<Settings, int> get, Action<Settings, int> set, Func<bool> detected = null)
+    /// <summary>
+    /// Curseur de luminosité : rendu en direct pendant le glissement, enregistré au relâchement.
+    /// Curseur d'appareil : grisé si l'appareil est coupé, et le bouger le rallume (sinon on règle sans rien voir changer).
+    /// </summary>
+    SliderRow Slider(string label, Func<Settings, int> get, Action<Settings, int> set,
+        Func<bool> detected = null, Func<Settings, bool> on = null, Action<Settings> turnOn = null)
     {
         var row = new SliderRow(label, _theme);
         row.Changed += (v, final) =>
         {
-            _engine.Update(s => set(s, v), save: final);
-            if (final) RefreshMenu();
+            bool wasOff = on != null && !on(_settings);
+            _engine.Update(s => { set(s, v); turnOn?.Invoke(s); }, save: final || wasOff);
+            if (final || wasOff) RefreshMenu();
         };
-        _sliders.Add((row, get, detected));
+        _sliders.Add((row, get, detected, on));
         return row;
     }
 
@@ -274,10 +279,12 @@ sealed class TrayApp : ApplicationContext
 
     void RefreshMenu()
     {
-        _statusBoard.Text = _engine.BoardStatus;
-        _statusRam.Text = _engine.RamStatus;
-        _statusCc.Text = _engine.CommanderStatus;
-        _statusKeyboard.Text = _engine.KeyboardStatus;
+        // Appareil coupé : dit en clair, la simple absence de coche passe inaperçue
+        static string Off(string status, bool on) => on ? status : status + " · coupé";
+        _statusBoard.Text = Off(_engine.BoardStatus, _settings.Mainboard);
+        _statusRam.Text = Off(_engine.RamStatus, _settings.Ram);
+        _statusCc.Text = Off(_engine.CommanderStatus, _settings.Commander);
+        _statusKeyboard.Text = Off(_engine.KeyboardStatus, _settings.Keyboard);
         _statusBoard.Checked = _settings.Mainboard;
         _statusRam.Checked = _settings.Ram;
         _statusCc.Checked = _settings.Commander;
@@ -287,9 +294,10 @@ sealed class TrayApp : ApplicationContext
         _statusCc.Visible = _engine.HasCommander;
         _statusKeyboard.Visible = _engine.HasKeyboard;
         _devices.Visible = _engine.HasBoard || _engine.HasRam || _engine.HasCommander || _engine.HasKeyboard;
-        foreach (var (row, get, detected) in _sliders)
+        foreach (var (row, get, detected, on) in _sliders)
         {
             row.Value = get(_settings);
+            row.Dimmed = on != null && !on(_settings);
             if (detected != null) row.Visible = detected();
         }
 

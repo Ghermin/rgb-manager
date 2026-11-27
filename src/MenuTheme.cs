@@ -288,6 +288,13 @@ sealed class SliderRow : ToolStripControlHost
         set => Slider.Value = value;
     }
 
+    /// <summary>Appareil coupé : curseur en gris.</summary>
+    public bool Dimmed
+    {
+        get => Slider.Dimmed;
+        set => Slider.Dimmed = value;
+    }
+
     public event Action<int, bool> Changed
     {
         add => Slider.Changed += value;
@@ -300,7 +307,7 @@ sealed class SliderControl : Control
     readonly string _label;
     readonly MenuTheme _theme;
     int _value = 100;
-    bool _drag, _hover;
+    bool _drag, _hover, _dimmed;
 
     public event Action<int, bool> Changed;
 
@@ -323,6 +330,17 @@ sealed class SliderControl : Control
             value = Compat.Clamp(value, 0, 100);
             if (value == _value) return;
             _value = value;
+            Invalidate();
+        }
+    }
+
+    public bool Dimmed
+    {
+        get => _dimmed;
+        set
+        {
+            if (value == _dimmed) return;
+            _dimmed = value;
             Invalidate();
         }
     }
@@ -398,11 +416,12 @@ sealed class SliderControl : Control
     {
         var g = e.Graphics;
         var p = _theme.P;
+        var ink = _dimmed ? p.Muted : p.Text;
         g.Clear(p.Back);
 
         var text = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine;
         if (LabelWidth > 0)
-            TextRenderer.DrawText(g, _label, Font, new Rectangle((int)Inset, 0, LabelWidth, Height), p.Text, text | TextFormatFlags.Left);
+            TextRenderer.DrawText(g, _label, Font, new Rectangle((int)Inset, 0, LabelWidth, Height), ink, text | TextFormatFlags.Left);
         TextRenderer.DrawText(g, $"{_value} %", Font, new Rectangle(Width - ValueWidth - (int)(8 * S), 0, ValueWidth, Height), p.Muted, text | TextFormatFlags.Right);
 
         g.SmoothingMode = SmoothingMode.AntiAlias;
@@ -411,16 +430,16 @@ sealed class SliderControl : Control
         using (var back = MenuTheme.Rounded(new RectangleF(x0, cy - h / 2, x1 - x0, h), h / 2))
         using (var b = new SolidBrush(p.Line))
             g.FillPath(b, back);
-        if (x > x0)
+        if (x > x0 && !_dimmed)
         {
             using var fill = MenuTheme.Rounded(new RectangleF(x0, cy - h / 2, x - x0, h), h / 2);
-            using var b = new SolidBrush(p.Text);
+            using var b = new SolidBrush(ink);
             g.FillPath(b, fill);
         }
         float r = Knob * (_drag || _hover ? 1.15f : 1f);
         using (var b = new SolidBrush(p.Back))
             g.FillEllipse(b, x - r, cy - r, 2 * r, 2 * r);
-        using (var pen = new Pen(p.Text, 2 * S))
+        using (var pen = new Pen(ink, 2 * S))
             g.DrawEllipse(pen, x - r, cy - r, 2 * r, 2 * r);
     }
 }
